@@ -62,5 +62,13 @@ limo.EnableCommand()
 #     time.sleep(0.1)
 
 for i in range(50):
-    limo.SetMotionCommand(linear_vel=-0.1,angular_vel=0.00)
+    limo.SetMotionCommand(linear_vel=-0.1,steering_angle=0)
+    time.sleep(0.1)
+
+for i in range(50):
+    limo.SetMotionCommand(linear_vel=-0.1,steering_angle=60)
+    time.sleep(0.1)
+
+for i in range(50):
+    limo.SetMotionCommand(linear_vel=-0.1, steering_angle=-60)
     time.sleep(0.1)
