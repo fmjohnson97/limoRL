@@ -41,22 +41,26 @@ limo.EnableCommand()
 # limo.SetMotionCommand(linear_vel=0.1,angular_vel=-0.01)
 # time.sleep(5)
 
-# left circle example
-for i in range(50):
-    limo.SetMotionCommand(linear_vel=0.1,angular_vel=-0.01, steering_angle=30)
-    time.sleep(0.1)
+# # left circle example
+# for i in range(50):
+#     limo.SetMotionCommand(linear_vel=0.1,angular_vel=-0.01, steering_angle=30)
+#     time.sleep(0.1)
+#
+# # right circle example
+# for i in range(50):
+#     limo.SetMotionCommand(linear_vel=0.1,angular_vel=-0.01, steering_angle=-30)
+#     time.sleep(0.1)
+#
+# # left circle example
+# for i in range(50):
+#     limo.SetMotionCommand(linear_vel=-0.1,angular_vel=0.01, steering_angle=-30)
+#     time.sleep(0.1)
+#
+# # right circle example
+# for i in range(50):
+#     limo.SetMotionCommand(linear_vel=-0.1,angular_vel=0.01, steering_angle=30)
+#     time.sleep(0.1)
 
-# right circle example
 for i in range(50):
-    limo.SetMotionCommand(linear_vel=0.1,angular_vel=-0.01, steering_angle=-30)
-    time.sleep(0.1)
-
-# left circle example
-for i in range(50):
-    limo.SetMotionCommand(linear_vel=-0.1,angular_vel=0.01, steering_angle=-30)
-    time.sleep(0.1)
-
-# right circle example
-for i in range(50):
-    limo.SetMotionCommand(linear_vel=-0.1,angular_vel=0.01, steering_angle=30)
+    limo.SetMotionCommand(linear_vel=-0.1,angular_vel=0.10)
     time.sleep(0.1)
