@@ -62,5 +62,5 @@ limo.EnableCommand()
 #     time.sleep(0.1)
 
 for i in range(50):
-    limo.SetMotionCommand(linear_vel=-0.1,angular_vel=0.10)
+    limo.SetMotionCommand(linear_vel=-0.1,angular_vel=0.00)
     time.sleep(0.1)
