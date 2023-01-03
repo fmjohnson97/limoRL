@@ -19,9 +19,13 @@ from torch.distributions.normal import Normal
 def getArgs():
     parser=argparse.ArgumentParser()
 
-    parser.add_argument('--limit', type=int, default=5000, help='max number of samples in the replay buffer')
+    parser.add_argument('--buffer_limit', type=int, default=5000, help='max number of samples in the replay buffer')
     parser.add_argument('--steps', type=int, default=100000, help='number of steps to train the network for')
     parser.add_argument('--buffer_init_steps', type=int, default=500, help='number of random actions to take before train loop')
+    parser.add_argument('--epochs', type=int, default=100, help='number of epochs for training')
+    parser.add_argument('--steps_per_epoch', type=int, default = 4000, help='max number of steps for each epoch')
+    parser.add_argument('--use_policy_step', type=int, default=10000, help='number of steps before using the learned policy')
+    parser.add_argument('--update_frequency', type=int, default=50)
     return parser.parse_args()
 
 def weights_init_(m):
@@ -70,12 +74,8 @@ class SACBaseline(nn.Module):
         self.total_params += sum(p.numel() for p in self.policyNetwork.parameters() if p.requires_grad)
         print('Initialized SAC Baseline with',self.total_params,'parameters!\n')
 
-
-    def forward(self, sample):
-        pass
-
     @torch.nograd()
-    def act(self, observation, deterministic=False):
+    def get_action(self, observation, deterministic=False):
         action, _ = self.policyNetwork(observation, deterministic, False)
         return action.numpy()
 
@@ -194,7 +194,7 @@ class PolicyNetwork(nn.Module):
 
         if withLogProb:
             logp_pi = pi_distribution.log_prob(pi_action).sum(axis=-1)
-            logp_pi -= (2 * (np.log(2) - pi_action - F.softplus(-2 * pi_action))).sum(axis=1)
+            logp_pi -= (2 * (np.log(2) - pi_action - nn.F.softplus(-2 * pi_action))).sum(axis=1)
         else:
             log_pi = None
 
@@ -205,11 +205,14 @@ class PolicyNetwork(nn.Module):
 
 
 class ReplayBuffer():
-    def __init__(self, limit=5000):
+    def __init__(self, batch_size=1, limit=5000):
         self.buffer=[]
         self.limit=limit
+        self.batch_size=batch_size
 
-    def sample(self, batch_size=1):
+    def sample(self, batch_size=None):
+        if batch_size is None:
+            batch_size=self.batch_size
         buff_output=[]
         for i in range(batch_size):
             ind=random.randint(0,len(self.buffer)-1)
@@ -220,7 +223,7 @@ class ReplayBuffer():
         #sample of the shape (s, a, r, s', done)
         self.buffer.append(sample)
         while len(self.buffer)>self.limit:
-            self.sample()
+            self.buffer.pop(0)
 
 
 class ResnetBackbone():
@@ -244,11 +247,13 @@ class ResnetBackbone():
 
 
 def train(args, img_backbone):
+    #TODO: add progress tracking for epoch reward and steps to termination
+
     # empty replay buffer
-    replay_buffer=ReplayBuffer(args.limit)
+    replay_buffer=ReplayBuffer(args.buffer_limit)
 
     # initialize enironment
-    env=gym.make("CarRacing-v2")#, domain_randomize=True
+    env=gym.make("CarRacing-v2",max_episode_steps=args.steps_per_epoch)#, domain_randomize=True
     obs_dim = env.observation_space.shape
     act_dim = env.action_space.shape[0] #there's 3: steering[-1,1], break, gas
     act_limit_high = env.action_space.high[0]
@@ -257,37 +262,79 @@ def train(args, img_backbone):
     #initialize networks/sac
     sac = SACBaseline(img_backbone,obs_dim, act_dim, [act_limit_low, act_limit_high])
 
-    # initial data collection to populate the replay buffer
+    # initial data collection
     observation, info = env.reset(seed=42)
-    while len(replay_buffer)<args.buffer_init_steps:
-        # take random actions and add to the buffer (s, a, r, s', done)
-        action = env.action_space.sample()
-        observation_new, reward, terminated, truncated, info = env.step(action)
+    ep_len = 0
+
+    ## train loop
+    for step in range(args.steps_per_epoch * args.epochs): #TODO: determine how many updates you actually want to do
+        if step < args.use_policy_step:
+            # take random actions and add to the buffer (s, a, r, s', done)
+            action = env.action_space.sample()
+            breakpoint() #to see what the possible actions look like
+        else:
+            action = sac.get_action(observation)
+
+        observation_new, reward, terminated, truncated, info = env.step(action) #TODO: this may not work with the brake and gas actions???
+        ep_len += 1
 
         # add to buffer
-        replay_buffer.addSample([observation, action, reward, observation_new, terminated or truncated])
+        d = terminated or truncated
+        d = False if ep_len == args.steps_per_epoch else d #so that timing out isn't penalized
+        replay_buffer.addSample([observation, action, reward, observation_new, d])
 
         #check if done else switch the observations
-        if terminated or truncated:
+        if terminated or truncated or ep_len == args.steps_per_epoch:
             observation, info = env.reset()
+            ep_len=0
         else:
             observation=observation_new
 
-    ## train loop
-    while True: #TODO: determine how many updates you actually want to do
-        #sample from the replay buffer
-        sample = replay_buffer.sample() #(s, a, r, s', done)
+        if len(replay_buffer) >= args.buffer_init_steps and step % args.update_frequency==0:
+            #sample from the replay buffer
+            sample = replay_buffer.sample() #(s, a, r, s', done)
 
-        # do the q and policy steps
-        # sac.qstep(sample)
+            # do the q and policy updates
+            sac.update(sample)
 
-        # store the results in the buffer
+            #end of epoch logging???
+            # # End of epoch handling
+            # if (t + 1) % steps_per_epoch == 0:
+            #     epoch = (t + 1) // steps_per_epoch
+            #
+            #     # Save model
+            #     if (epoch % save_freq == 0) or (epoch == epochs):
+            #         logger.save_state({'env': env}, None)
+            #
+            #     # Test the performance of the deterministic version of the agent.
+            #     test_agent()
+            #
+            #     # Log info about epoch
+            #     logger.log_tabular('Epoch', epoch)
+            #     logger.log_tabular('EpRet', with_min_and_max=True)
+            #     logger.log_tabular('TestEpRet', with_min_and_max=True)
+            #     logger.log_tabular('EpLen', average_only=True)
+            #     logger.log_tabular('TestEpLen', average_only=True)
+            #     logger.log_tabular('TotalEnvInteracts', t)
+            #     logger.log_tabular('Q1Vals', with_min_and_max=True)
+            #     logger.log_tabular('Q2Vals', with_min_and_max=True)
+            #     logger.log_tabular('LogPi', with_min_and_max=True)
+            #     logger.log_tabular('LossPi', average_only=True)
+            #     logger.log_tabular('LossQ', average_only=True)
+            #     logger.log_tabular('Time', time.time() - start_time)
 
-        # sample from the buffer
-
-        # update
     return sac
 
+    #TODO: potential test function for the agent
+    # def test_agent():
+    #     for j in range(num_test_episodes):
+    #         o, d, ep_ret, ep_len = test_env.reset(), False, 0, 0
+    #         while not (d or (ep_len == max_ep_len)):
+    #             # Take deterministic actions at test time
+    #             o, r, d, _ = test_env.step(get_action(o, True))
+    #             ep_ret += r
+    #             ep_len += 1
+    #         logger.store(TestEpRet=ep_ret, TestEpLen=ep_len)
 
 if __name__=='__main__':
     args=getArgs()
