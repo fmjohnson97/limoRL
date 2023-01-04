@@ -67,9 +67,11 @@ class SACBaseline(nn.Module):
         # note: all using a shared feature extractor which isn't getting any loss backprop-ed
         feat_dim= 512 * 7 * 7
         self.q1network = QNetwork(feat_dim, action_dim).to(device)
-        self.targetQ1 = deepcopy(self.q1network).to(device)
+        self.targetQ1 = deepcopy(self.q1network)
+        self.targetQ1 = self.targetQ1.to(device)
         self.q2network = QNetwork(feat_dim, action_dim).to(device)
-        self.targetQ2 = deepcopy(self.q2network).to(device)
+        self.targetQ2 = deepcopy(self.q2network)
+        self.targetQ2 = self.targetQ2.to(device)
         self.policyNetwork = PolicyNetwork(args, feat_dim, action_dim, action_limit).to(device)
 
         # gathering hyperparameters
