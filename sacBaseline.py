@@ -62,14 +62,15 @@ class SACBaseline(nn.Module):
         #TODO: alpha schedule
 
         self.device = device
+        self.backbone=backbone
         # initialize networks
         # note: all using a shared feature extractor which isn't getting any loss backprop-ed
         feat_dim= 512 * 7 * 7
-        self.q1network = QNetwork(backbone, feat_dim, action_dim).to(device)
+        self.q1network = QNetwork(feat_dim, action_dim).to(device)
         self.targetQ1 = deepcopy(self.q1network)
-        self.q2network = QNetwork(backbone, feat_dim, action_dim).to(device)
+        self.q2network = QNetwork(feat_dim, action_dim).to(device)
         self.targetQ2 = deepcopy(self.q2network)
-        self.policyNetwork = PolicyNetwork(args, backbone, feat_dim, action_dim, action_limit).to(device)
+        self.policyNetwork = PolicyNetwork(args, feat_dim, action_dim, action_limit).to(device)
 
         # gathering hyperparameters
         self.gamma = args.gamma
@@ -97,39 +98,43 @@ class SACBaseline(nn.Module):
 
     @torch.no_grad()
     def get_action(self, observation, deterministic=False):
-        action, _ = self.policyNetwork(observation, deterministic, False)
+        img_feats = self.backbone.extractFeatures(observation)
+        action, _ = self.policyNetwork(img_feats, deterministic, False)
         return action.squeeze().numpy()
 
     @torch.no_grad()
     def computeQTargets(self, sample):
         # (s, a, r, s', done)
         observation, action, reward, observation_new, done = sample
+        img_new_feats = self.backbone.extractFeatures(observation_new)
+
         #get the target action from the current policy
-        action_new, log_pi_new = self.policyNetwork(observation_new)
+        action_new, log_pi_new = self.policyNetwork(img_new_feats)
 
         #get target q values
-        targetq1_out = self.targetQ1(observation_new, torch.FloatTensor(action_new).to(self.device))
-        targetq2_out = self.targetQ2(observation_new, torch.FloatTensor(action_new).to(self.device))
+        targetq1_out = self.targetQ1(img_new_feats, torch.FloatTensor(action_new).to(self.device))
+        targetq2_out = self.targetQ2(img_new_feats, torch.FloatTensor(action_new).to(self.device))
         q_targ_out = torch.min(targetq1_out, targetq2_out)
 
         return torch.FloatTensor(reward.reshape(len(reward), 1) + self.gamma * (1-done).reshape(len(done),1) * (q_targ_out.numpy() - self.alpha * log_pi_new.numpy())).to(self.device)
 
-    def computePolicyLoss(self, observation):
-        pi_action, log_pi_action = self.policyNetwork(observation)
-        q1_policy = self.q1network(observation, torch.FloatTensor(pi_action).to(self.device))
-        q2_policy = self.q2network(observation, torch.FloatTensor(pi_action).to(self.device))
+    def computePolicyLoss(self, img_feats):
+        pi_action, log_pi_action = self.policyNetwork(img_feats)
+        q1_policy = self.q1network(img_feats, torch.FloatTensor(pi_action).to(self.device))
+        q2_policy = self.q2network(img_feats, torch.FloatTensor(pi_action).to(self.device))
         q_value = torch.min(q1_policy, q2_policy)
         return self.loss_func(q_value, self.alpha * log_pi_action)  # (alpha * logp_pi - q_pi).mean(); they use L1 loss for some reason???
         # TODO: change ^^^ if this doesn't converge
 
     def update(self, sample):
         observation, action, reward, observation_new, done = sample
+        img_feats = self.backbone.extractFeatures(observation)
 
         # compute q networks loss and backprop it
         self.q_opt.zero_grad()
         q_target = self.computeQTargets(sample)
-        q1_out = self.q1network(observation, torch.FloatTensor(action).to(self.device))
-        q2_out = self.q2network(observation, torch.FloatTensor(action).to(self.device))
+        q1_out = self.q1network(img_feats, torch.FloatTensor(action).to(self.device))
+        q2_out = self.q2network(img_feats, torch.FloatTensor(action).to(self.device))
         q1_loss = self.loss_func(q1_out, q_target)
         q2_loss = self.loss_func(q2_out, q_target)
         q_loss = q1_loss + q2_loss
@@ -144,7 +149,7 @@ class SACBaseline(nn.Module):
 
         # compute policy network loss and backprop it
         self.policy_opt.zero_grad()
-        policy_loss = self.computePolicyLoss(observation)
+        policy_loss = self.computePolicyLoss(img_feats)
         policy_loss.backward()
         self.policy_opt.step()
 
@@ -177,10 +182,9 @@ class SACBaseline(nn.Module):
 
 
 class QNetwork(nn.Module):
-    def __init__(self, backbone, feat_dim, action_dim):
+    def __init__(self, feat_dim, action_dim):
         super(QNetwork, self).__init__()
         #pretrained feature extractor
-        self.backbone = backbone
         self.fc1=Linear(feat_dim + action_dim,feat_dim // 8)
         self.fc2 = Linear(feat_dim // 8, feat_dim // 64)
         self.fc3 = Linear(feat_dim // 64, 1)
@@ -191,18 +195,16 @@ class QNetwork(nn.Module):
         weights_init_(self.fc2)
         weights_init_(self.fc3)
 
-    def forward(self, img, action):
-        feats=self.backbone.extractFeatures(img)
-        feats = self.prelu1(self.fc1(torch.cat((feats, action), axis=-1)))
+    def forward(self, img_feats, action):
+        feats = self.prelu1(self.fc1(torch.cat((img_feats, action), axis=-1)))
         feats = self.prelu2(self.fc2(feats))
         return self.fc3(feats)
 
 
 class PolicyNetwork(nn.Module):
-    def __init__(self, args, backbone, feat_dim, action_dim, action_limit):
+    def __init__(self, args, feat_dim, action_dim, action_limit):
         super(PolicyNetwork, self).__init__()
         # pretrained feature extractor
-        self.backbone = backbone
         self.fc1 = Linear(feat_dim, feat_dim // 8)
         self.fc2 = Linear(feat_dim // 8, feat_dim // 64)
         self.prelu1 = PReLU()
@@ -219,10 +221,9 @@ class PolicyNetwork(nn.Module):
         weights_init_(self.fc1)
         weights_init_(self.fc2)
 
-    def forward(self, img, deterministic=False, withLogProb=True):
+    def forward(self, img_feats, deterministic=False, withLogProb=True):
         #extracts features from the image observation
-        feats = self.backbone.extractFeatures(img)
-        feats = self.prelu1(self.fc1(feats))
+        feats = self.prelu1(self.fc1(img_feats))
         feats = self.prelu2(self.fc2(feats))
         #Needs to output (1) the steering angle (between [-1,1]) and (2) whether to push the gas and (3) whether to push the break
         # steering angle is continuous (so need mean and std output for probabilistic modeling)
