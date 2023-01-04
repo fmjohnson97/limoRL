@@ -114,8 +114,6 @@ class SACBaseline(nn.Module):
         action_new, log_pi_new = self.policyNetwork(img_new_feats)
 
         #get target q values
-        action_new = torch.FloatTensor(action_new)
-        action_new = action_new.to(self.device)
         targetq1_out = self.targetQ1(img_new_feats, action_new)
         targetq2_out = self.targetQ2(img_new_feats, action_new)
         q_targ_out = torch.min(targetq1_out, targetq2_out)
