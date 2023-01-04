@@ -61,12 +61,13 @@ class SACBaseline(nn.Module):
         #TODO: learning schedule
         #TODO: alpha schedule
 
+        self.device = device
         # initialize networks
         # note: all using a shared feature extractor which isn't getting any loss backprop-ed
         feat_dim= 512 * 7 * 7
-        self.q1network = QNetwork(device, backbone, feat_dim, action_dim).to(device)
+        self.q1network = QNetwork(backbone, feat_dim, action_dim).to(device)
         self.targetQ1 = deepcopy(self.q1network)
-        self.q2network = QNetwork(device, backbone, feat_dim, action_dim).to(device)
+        self.q2network = QNetwork(backbone, feat_dim, action_dim).to(device)
         self.targetQ2 = deepcopy(self.q2network)
         self.policyNetwork = PolicyNetwork(args, backbone, feat_dim, action_dim, action_limit).to(device)
 
@@ -107,16 +108,16 @@ class SACBaseline(nn.Module):
         action_new, log_pi_new = self.policyNetwork(observation_new)
 
         #get target q values
-        targetq1_out = self.targetQ1(observation_new, torch.FloatTensor(action_new))
-        targetq2_out = self.targetQ2(observation_new, torch.FloatTensor(action_new))
+        targetq1_out = self.targetQ1(observation_new, torch.FloatTensor(action_new).to(self.device))
+        targetq2_out = self.targetQ2(observation_new, torch.FloatTensor(action_new).to(self.device))
         q_targ_out = torch.min(targetq1_out, targetq2_out)
 
-        return torch.FloatTensor(reward.reshape(len(reward), 1) + self.gamma * (1-done).reshape(len(done),1) * (q_targ_out.numpy() - self.alpha * log_pi_new.numpy()))
+        return torch.FloatTensor(reward.reshape(len(reward), 1) + self.gamma * (1-done).reshape(len(done),1) * (q_targ_out.numpy() - self.alpha * log_pi_new.numpy())).to(self.device)
 
     def computePolicyLoss(self, observation):
         pi_action, log_pi_action = self.policyNetwork(observation)
-        q1_policy = self.q1network(observation, torch.FloatTensor(pi_action))
-        q2_policy = self.q2network(observation, torch.FloatTensor(pi_action))
+        q1_policy = self.q1network(observation, torch.FloatTensor(pi_action).to(self.device))
+        q2_policy = self.q2network(observation, torch.FloatTensor(pi_action).to(self.device))
         q_value = torch.min(q1_policy, q2_policy)
         return self.loss_func(q_value, self.alpha * log_pi_action)  # (alpha * logp_pi - q_pi).mean(); they use L1 loss for some reason???
         # TODO: change ^^^ if this doesn't converge
@@ -127,8 +128,8 @@ class SACBaseline(nn.Module):
         # compute q networks loss and backprop it
         self.q_opt.zero_grad()
         q_target = self.computeQTargets(sample)
-        q1_out = self.q1network(observation, torch.FloatTensor(action))
-        q2_out = self.q2network(observation, torch.FloatTensor(action))
+        q1_out = self.q1network(observation, torch.FloatTensor(action).to(self.device))
+        q2_out = self.q2network(observation, torch.FloatTensor(action).to(self.device))
         q1_loss = self.loss_func(q1_out, q_target)
         q2_loss = self.loss_func(q2_out, q_target)
         q_loss = q1_loss + q2_loss
@@ -176,10 +177,9 @@ class SACBaseline(nn.Module):
 
 
 class QNetwork(nn.Module):
-    def __init__(self, device, backbone, feat_dim, action_dim):
+    def __init__(self, backbone, feat_dim, action_dim):
         super(QNetwork, self).__init__()
         #pretrained feature extractor
-        self.device=device
         self.backbone = backbone
         self.fc1=Linear(feat_dim + action_dim,feat_dim // 8)
         self.fc2 = Linear(feat_dim // 8, feat_dim // 64)
@@ -192,7 +192,6 @@ class QNetwork(nn.Module):
         weights_init_(self.fc3)
 
     def forward(self, img, action):
-        action = action.to(self.device)
         feats=self.backbone.extractFeatures(img)
         feats = self.prelu1(self.fc1(torch.cat((feats, action), axis=-1)))
         feats = self.prelu2(self.fc2(feats))
