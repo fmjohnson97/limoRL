@@ -97,7 +97,7 @@ class SACBaseline(nn.Module):
     @torch.no_grad()
     def get_action(self, observation, deterministic=False):
         action, _ = self.policyNetwork(observation, deterministic, False)
-        return action.numpy()
+        return action.squeeze().numpy()
 
     @torch.no_grad()
     def computeQTargets(self, sample):
@@ -343,10 +343,10 @@ def train(args):
             # take random actions and add to the buffer (s, a, r, s', done)
             action = env.action_space.sample()
         else:
-            action = sac.get_action(observation)
-            frame = env.render()
-            plt.imshow(frame)
-            plt.pause(0.1)
+            action = sac.get_action(np.stack([observation]))
+            # frame = env.render()
+            # plt.imshow(frame)
+            # plt.pause(0.1)
 
         observation_new, reward, terminated, truncated, info = env.step(action)
         ep_len += 1
