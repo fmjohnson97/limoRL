@@ -164,6 +164,9 @@ class SACBaseline(nn.Module):
                 targ_param.data.mul_(self.polyak)
                 targ_param.data.add_((1 - self.polyak) * param.data)
 
+            self.targetQ1 = self.targetQ1.to(self.device)
+            self.targetQ2 = self.targetQ2.to(self.device)
+
         # turn grad back on for the q networks
         for param in self.q1network.parameters():
             param.requires_grad = True
