@@ -298,7 +298,8 @@ class ResnetBackbone():
         self.preprocess = weights.transforms()
         model = resnet18(weights=weights).to(device)
         model.eval()
-        self.feat_ext = feature_extraction.create_feature_extractor(model, return_nodes=[self.return_node]).to(device)
+        self.feat_ext = feature_extraction.create_feature_extractor(model, return_nodes=[self.return_node])
+        self.feat_ext = self.feat_ext.to(device)
         for param in self.feat_ext.parameters():
             param.requires_grad = False
 
