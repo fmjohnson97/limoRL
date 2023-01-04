@@ -56,7 +56,7 @@ def weights_init_(m):
 
 
 class SACBaseline(nn.Module):
-    def __init__(self, args, backbone, action_dim, action_limit):
+    def __init__(self, args, backbone, action_dim, action_limit, device):
         super(SACBaseline, self).__init__()
         #TODO: learning schedule
         #TODO: alpha schedule
@@ -64,11 +64,11 @@ class SACBaseline(nn.Module):
         # initialize networks
         # note: all using a shared feature extractor which isn't getting any loss backprop-ed
         feat_dim= 512 * 7 * 7
-        self.q1network = QNetwork(backbone, feat_dim, action_dim)
+        self.q1network = QNetwork(device, backbone, feat_dim, action_dim).to(device)
         self.targetQ1 = deepcopy(self.q1network)
-        self.q2network = QNetwork(backbone, feat_dim, action_dim)
+        self.q2network = QNetwork(device, backbone, feat_dim, action_dim).to(device)
         self.targetQ2 = deepcopy(self.q2network)
-        self.policyNetwork = PolicyNetwork(args, backbone, feat_dim, action_dim, action_limit)
+        self.policyNetwork = PolicyNetwork(args, backbone, feat_dim, action_dim, action_limit).to(device)
 
         # gathering hyperparameters
         self.gamma = args.gamma
@@ -176,9 +176,10 @@ class SACBaseline(nn.Module):
 
 
 class QNetwork(nn.Module):
-    def __init__(self, backbone, feat_dim, action_dim):
+    def __init__(self, device, backbone, feat_dim, action_dim):
         super(QNetwork, self).__init__()
         #pretrained feature extractor
+        self.device=device
         self.backbone = backbone
         self.fc1=Linear(feat_dim + action_dim,feat_dim // 8)
         self.fc2 = Linear(feat_dim // 8, feat_dim // 64)
@@ -191,7 +192,7 @@ class QNetwork(nn.Module):
         weights_init_(self.fc3)
 
     def forward(self, img, action):
-        # takes in the state and the corresponding action given that state and random noise?
+        action = action.to(self.device)
         feats=self.backbone.extractFeatures(img)
         feats = self.prelu1(self.fc1(torch.cat((feats, action), axis=-1)))
         feats = self.prelu2(self.fc2(feats))
@@ -285,6 +286,7 @@ class ResnetBackbone():
     def __init__(self, device, args):
         self.return_node = args.return_node
         self.createResnetBackbone(device)
+        self.device=device
 
     def createResnetBackbone(self,device):
         weights = ResNet18_Weights.DEFAULT
@@ -302,7 +304,8 @@ class ResnetBackbone():
             for im in img:
                 im = Image.fromarray(im)
                 img_ext.append(torch.FloatTensor(self.preprocess(im)))
-        features = self.feat_ext(torch.stack(img_ext))
+        img_ext=torch.stack(img_ext).to(self.device)
+        features = self.feat_ext(img_ext)
         # breakpoint()
         return features[self.return_node].reshape(len(features[self.return_node]), -1)
 
@@ -327,7 +330,7 @@ def train(args):
     act_limit_low = env.action_space.low[0]
 
     #initialize networks/sac
-    sac = SACBaseline(args, img_backbone, act_dim, [act_limit_low, act_limit_high])
+    sac = SACBaseline(args, img_backbone, act_dim, [act_limit_low, act_limit_high], device)
 
     # initial data collection
     observation, info = env.reset(seed=42)
