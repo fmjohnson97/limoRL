@@ -102,7 +102,7 @@ class SACBaseline(nn.Module):
     def get_action(self, observation, deterministic=False):
         img_feats = self.backbone.extractFeatures(observation)
         action, _ = self.policyNetwork(img_feats, deterministic, False)
-        return action.squeeze().numpy()
+        return action.squeeze().cpu().numpy()
 
     @torch.no_grad()
     def computeQTargets(self, sample):
@@ -118,7 +118,7 @@ class SACBaseline(nn.Module):
         targetq2_out = self.targetQ2(img_new_feats, action_new)
         q_targ_out = torch.min(targetq1_out, targetq2_out)
 
-        q_target = torch.FloatTensor(reward.reshape(len(reward), 1) + self.gamma * (1-done).reshape(len(done),1) * (q_targ_out.numpy() - self.alpha * log_pi_new.numpy()))
+        q_target = torch.FloatTensor(reward.reshape(len(reward), 1) + self.gamma * (1-done).reshape(len(done),1) * (q_targ_out.cpu().numpy() - self.alpha * log_pi_new.cpu().numpy()))
         q_target = q_target.to(self.device)
         return q_target
 
