@@ -318,7 +318,6 @@ class ResnetBackbone():
 
 
 def train(args):
-    #TODO: put all the network inputs on the same device
     #TODO: add win condition ending for training
     #TODO: test the model performance
 
