@@ -114,16 +114,20 @@ class SACBaseline(nn.Module):
         action_new, log_pi_new = self.policyNetwork(img_new_feats)
 
         #get target q values
-        targetq1_out = self.targetQ1(img_new_feats, torch.FloatTensor(action_new).to(self.device))
-        targetq2_out = self.targetQ2(img_new_feats, torch.FloatTensor(action_new).to(self.device))
+        action_new = torch.FloatTensor(action_new)
+        action_new = action_new.to(self.device)
+        targetq1_out = self.targetQ1(img_new_feats, action_new)
+        targetq2_out = self.targetQ2(img_new_feats, action_new)
         q_targ_out = torch.min(targetq1_out, targetq2_out)
 
-        return torch.FloatTensor(reward.reshape(len(reward), 1) + self.gamma * (1-done).reshape(len(done),1) * (q_targ_out.numpy() - self.alpha * log_pi_new.numpy())).to(self.device)
+        q_target = torch.FloatTensor(reward.reshape(len(reward), 1) + self.gamma * (1-done).reshape(len(done),1) * (q_targ_out.numpy() - self.alpha * log_pi_new.numpy()))
+        q_target = q_target.to(self.device)
+        return q_target
 
     def computePolicyLoss(self, img_feats):
         pi_action, log_pi_action = self.policyNetwork(img_feats)
-        q1_policy = self.q1network(img_feats, torch.FloatTensor(pi_action).to(self.device))
-        q2_policy = self.q2network(img_feats, torch.FloatTensor(pi_action).to(self.device))
+        q1_policy = self.q1network(img_feats, pi_action)
+        q2_policy = self.q2network(img_feats, pi_action)
         q_value = torch.min(q1_policy, q2_policy)
         return self.loss_func(q_value, self.alpha * log_pi_action)  # (alpha * logp_pi - q_pi).mean(); they use L1 loss for some reason???
         # TODO: change ^^^ if this doesn't converge
@@ -131,12 +135,14 @@ class SACBaseline(nn.Module):
     def update(self, sample):
         observation, action, reward, observation_new, done = sample
         img_feats = self.backbone.extractFeatures(observation)
+        action = torch.FloatTensor(action)
+        action = action.to(self.device)
 
         # compute q networks loss and backprop it
         self.q_opt.zero_grad()
         q_target = self.computeQTargets(sample)
-        q1_out = self.q1network(img_feats, torch.FloatTensor(action).to(self.device))
-        q2_out = self.q2network(img_feats, torch.FloatTensor(action).to(self.device))
+        q1_out = self.q1network(img_feats, action)
+        q2_out = self.q2network(img_feats, action)
         q1_loss = self.loss_func(q1_out, q_target)
         q2_loss = self.loss_func(q2_out, q_target)
         q_loss = q1_loss + q2_loss
@@ -163,9 +169,6 @@ class SACBaseline(nn.Module):
             for param, targ_param in zip(self.q2network.parameters(), self.targetQ2.parameters()):
                 targ_param.data.mul_(self.polyak)
                 targ_param.data.add_((1 - self.polyak) * param.data)
-
-            self.targetQ1 = self.targetQ1.to(self.device)
-            self.targetQ2 = self.targetQ2.to(self.device)
 
         # turn grad back on for the q networks
         for param in self.q1network.parameters():
