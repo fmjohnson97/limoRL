@@ -127,7 +127,7 @@ class SACBaseline(nn.Module):
         q1_policy = self.q1network(img_feats, pi_action)
         q2_policy = self.q2network(img_feats, pi_action)
         q_value = torch.min(q1_policy, q2_policy)
-        return self.loss_func(q_value, self.alpha * log_pi_action)  # (alpha * logp_pi - q_pi).mean(); they use L1 loss for some reason???
+        return (self.alpha * log_pi_action - q_value).mean() #self.loss_func(q_value, self.alpha * log_pi_action)  # they use L1 loss for some reason???
         # TODO: change ^^^ if this doesn't converge
 
     def update(self, sample):
