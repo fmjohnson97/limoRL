@@ -22,17 +22,17 @@ def getArgs():
     parser=argparse.ArgumentParser()
 
     # training hyperparameters
-    parser.add_argument('--batch_size', type=int, default=4, help='number of samples used to update the networks at once')
+    parser.add_argument('--batch_size', type=int, default=32, help='number of samples used to update the networks at once')
     parser.add_argument('--epochs', type=int, default=100, help='number of epochs for training')
     parser.add_argument('--steps_per_epoch', type=int, default = 4000, help='max number of steps for each epoch')
-    parser.add_argument('--use_policy_step', type=int, default=10000, help='number of steps before using the learned policy')
+    parser.add_argument('--use_policy_step', type=int, default=40000, help='number of steps before using the learned policy')
     parser.add_argument('--update_frequency', type=int, default=50)
-    parser.add_argument('--lr', type=float, default=1e-3)
+    parser.add_argument('--lr', type=float, default=1e-4, help='learning rate for training')
     parser.add_argument('--save_name', default=None, help='prefix name for saving the SAC networks')
 
     # buffer hyperparameters
-    parser.add_argument('--buffer_limit', type=int, default=5000, help='max number of samples in the replay buffer')
-    parser.add_argument('--buffer_init_steps', type=int, default=500, help='number of random actions to take before train loop')
+    parser.add_argument('--buffer_limit', type=int, default=40000, help='max number of samples in the replay buffer')
+    parser.add_argument('--buffer_init_steps', type=int, default=4000, help='number of random actions to take before train loop')
 
     # sac hyperparameters
     parser.add_argument('--gamma', type=float, default=0.99, help='discount factor for SAC RL')
@@ -60,6 +60,7 @@ class SACBaseline(nn.Module):
         super(SACBaseline, self).__init__()
         #TODO: learning schedule
         #TODO: alpha schedule
+        #TODO: add save flag for networks
 
         self.device = device
         self.backbone=backbone
@@ -127,7 +128,7 @@ class SACBaseline(nn.Module):
         q1_policy = self.q1network(img_feats, pi_action)
         q2_policy = self.q2network(img_feats, pi_action)
         q_value = torch.min(q1_policy, q2_policy)
-        return (self.alpha * log_pi_action - q_value).mean() #self.loss_func(q_value, self.alpha * log_pi_action)  # they use L1 loss for some reason???
+        return (q_value - self.alpha * log_pi_action).mean() #self.loss_func(q_value, self.alpha * log_pi_action)  # they use L1 loss for some reason???
         # TODO: change ^^^ if this doesn't converge
 
     def update(self, sample):
