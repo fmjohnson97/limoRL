@@ -67,8 +67,8 @@ class SACBaseline(nn.Module):
         # initialize networks
         # note: all using a shared feature extractor which isn't getting any loss backprop-ed
         feat_dim= 1024#512 * 7 * 7
-        self.img_fc = Linear(96*96*3,feat_dim)
-        self.prelu = PReLU()
+        self.img_fc = Linear(96*96*3,feat_dim).to(device)
+        self.prelu = PReLU().to(device)
         self.q1network = QNetwork(feat_dim, action_dim).to(device)
         self.targetQ1 = deepcopy(self.q1network)
         self.targetQ1 = self.targetQ1.to(device)
@@ -104,7 +104,9 @@ class SACBaseline(nn.Module):
 
     @torch.no_grad()
     def get_action(self, observation, deterministic=False):
-        img_feats = self.backbone.extractFeatures(observation)
+        # img_feats = self.backbone.extractFeatures(observation)
+        observation = torch.FloatTensor(observation).reshape(len(observation), -1).to(self.device)
+        img_feats = self.prelu(self.img_fc(observation))
         action, _ = self.policyNetwork(img_feats, deterministic, False)
         return action.squeeze().cpu().numpy()
 
