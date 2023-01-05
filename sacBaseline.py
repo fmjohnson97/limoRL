@@ -66,7 +66,7 @@ class SACBaseline(nn.Module):
         self.backbone=backbone
         # initialize networks
         # note: all using a shared feature extractor which isn't getting any loss backprop-ed
-        feat_dim= 512 * 7 * 7
+        feat_dim= 1024#512 * 7 * 7
         self.img_fc = Linear(96*96*3,feat_dim)
         self.prelu = PReLU()
         self.q1network = QNetwork(feat_dim, action_dim).to(device)
