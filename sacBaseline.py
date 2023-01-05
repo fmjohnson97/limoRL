@@ -91,7 +91,8 @@ class SACBaseline(nn.Module):
         self.q_opt = optim.Adam(itertools.chain(self.q1network.parameters(), self.q2network.parameters()), lr=args.lr)
 
         #init loss function
-        self.loss_func=nn.MSELoss()
+        self.q_loss_func=nn.MSELoss()
+        self.pi_loss_func = nn.L1Loss()
 
         #print stats
         self.total_params = sum(p.numel() for p in self.q1network.parameters() if p.requires_grad)
@@ -128,7 +129,7 @@ class SACBaseline(nn.Module):
         q1_policy = self.q1network(img_feats, pi_action)
         q2_policy = self.q2network(img_feats, pi_action)
         q_value = torch.min(q1_policy, q2_policy)
-        return (q_value - self.alpha * log_pi_action).mean() #self.loss_func(q_value, self.alpha * log_pi_action)  # they use L1 loss for some reason???
+        return self.pi_loss_func(q_value, self.alpha * log_pi_action)  #(q_value - self.alpha * log_pi_action).mean() # they use L1 loss for some reason???
         # TODO: change ^^^ if this doesn't converge
 
     def update(self, sample):
@@ -142,8 +143,8 @@ class SACBaseline(nn.Module):
         q_target = self.computeQTargets(sample)
         q1_out = self.q1network(img_feats, action)
         q2_out = self.q2network(img_feats, action)
-        q1_loss = self.loss_func(q1_out, q_target)
-        q2_loss = self.loss_func(q2_out, q_target)
+        q1_loss = self.q_loss_func(q1_out, q_target)
+        q2_loss = self.q_loss_func(q2_out, q_target)
         q_loss = q1_loss + q2_loss
         q_loss.backward()
         self.q_opt.step()
