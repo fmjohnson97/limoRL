@@ -25,7 +25,7 @@ def getArgs():
     parser.add_argument('--batch_size', type=int, default=32, help='number of samples used to update the networks at once')
     parser.add_argument('--epochs', type=int, default=100, help='number of epochs for training')
     parser.add_argument('--steps_per_epoch', type=int, default = 4000, help='max number of steps for each epoch')
-    parser.add_argument('--use_policy_step', type=int, default=40000, help='number of steps before using the learned policy')
+    parser.add_argument('--use_policy_step', type=int, default=20000, help='number of steps before using the learned policy')
     parser.add_argument('--update_frequency', type=int, default=50)
     parser.add_argument('--lr', type=float, default=1e-4, help='learning rate for training')
     parser.add_argument('--save_name', default=None, help='prefix name for saving the SAC networks')
@@ -67,6 +67,8 @@ class SACBaseline(nn.Module):
         # initialize networks
         # note: all using a shared feature extractor which isn't getting any loss backprop-ed
         feat_dim= 512 * 7 * 7
+        self.img_fc = Linear(96*96*3,feat_dim)
+        self.prelu = PReLU()
         self.q1network = QNetwork(feat_dim, action_dim).to(device)
         self.targetQ1 = deepcopy(self.q1network)
         self.targetQ1 = self.targetQ1.to(device)
@@ -110,7 +112,8 @@ class SACBaseline(nn.Module):
     def computeQTargets(self, sample):
         # (s, a, r, s', done)
         observation, action, reward, observation_new, done = sample
-        img_new_feats = self.backbone.extractFeatures(observation_new)
+        observation_new = torch.FloatTensor(observation_new).reshape(len(observation_new),-1).to(self.device)
+        img_new_feats = self.prelu(self.img_fc(observation_new)) #self.backbone.extractFeatures(observation_new)
 
         #get the target action from the current policy
         action_new, log_pi_new = self.policyNetwork(img_new_feats)
@@ -134,7 +137,8 @@ class SACBaseline(nn.Module):
 
     def update(self, sample):
         observation, action, reward, observation_new, done = sample
-        img_feats = self.backbone.extractFeatures(observation)
+        observation = torch.FloatTensor(observation).reshape(len(observation), -1).to(self.device)
+        img_feats = self.prelu(self.img_fc(observation)) #self.backbone.extractFeatures(observation)
         action = torch.FloatTensor(action)
         action = action.to(self.device)
 
@@ -146,7 +150,7 @@ class SACBaseline(nn.Module):
         q1_loss = self.q_loss_func(q1_out, q_target)
         q2_loss = self.q_loss_func(q2_out, q_target)
         q_loss = q1_loss + q2_loss
-        q_loss.backward()
+        q_loss.backward(retain_graph=True)
         self.q_opt.step()
 
         # freeze q weights to ease policy network backprop computation
@@ -154,6 +158,7 @@ class SACBaseline(nn.Module):
             param.requires_grad = False
         for param in self.q2network.parameters():
             param.requires_grad = False
+
 
         # compute policy network loss and backprop it
         self.policy_opt.zero_grad()
