@@ -340,6 +340,9 @@ def train(args):
     #TODO: add win condition ending for training
     #TODO: test the model performance
 
+    torch.manual_seed(420)
+    np.random.seed(420)
+
     # make the resnet backbone
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     img_backbone = ResnetBackbone(device, args)
