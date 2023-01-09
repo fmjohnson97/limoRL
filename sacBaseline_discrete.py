@@ -13,7 +13,7 @@ import numpy as np
 from PIL import Image
 from copy import deepcopy
 from torchvision.models import feature_extraction, resnet18, ResNet18_Weights
-from torch.nn import Linear, PReLU, Sigmoid, Tanh, Conv2d, ReLU
+from torch.nn import Linear, PReLU, Sigmoid, Tanh
 from torch.distributions.normal import Normal
 from matplotlib import pyplot as plt
 
@@ -54,13 +54,11 @@ def weights_init_(m):
         torch.nn.init.xavier_uniform_(m.weight, gain=1)
         torch.nn.init.constant_(m.bias, 0)
 
-class Flatten(nn.Module):
-    def forward(self, x):
-        return x.view(x.size(0), -1)
 
 class SACBaseline(nn.Module):
     def __init__(self, args, backbone, action_dim, action_limit, device):
         super(SACBaseline, self).__init__()
+        #TODO: try discrete action space
         #TODO: try value based method instead?
         #TODO: learning schedule
         #TODO: alpha schedule
@@ -70,11 +68,8 @@ class SACBaseline(nn.Module):
         self.backbone=backbone
         # initialize networks
         # note: all using a shared feature extractor which isn't getting any loss backprop-ed
-        feat_dim= 4096# fc 2048 # resnet 512 * 7 * 7
-        # self.img_fc = Linear(96*96*3,feat_dim).to(device)
-        self.img_fc = nn.Sequential(Conv2d(3, 32, kernel_size=8, stride=4, padding=0), ReLU(),
-                                    Conv2d(32, 64, kernel_size=4, stride=2, padding=0), ReLU(),
-                                    Conv2d(64, 64, kernel_size=3, stride=1, padding=0), Flatten()).to(device)
+        feat_dim= 2048#512 * 7 * 7
+        self.img_fc = Linear(96*96*3,feat_dim).to(device)
         self.prelu = PReLU().to(device)
         self.q1network = QNetwork(feat_dim, action_dim).to(device)
         self.targetQ1 = deepcopy(self.q1network)
@@ -107,14 +102,12 @@ class SACBaseline(nn.Module):
         self.total_params = sum(p.numel() for p in self.q1network.parameters() if p.requires_grad)
         self.total_params += sum(p.numel() for p in self.q2network.parameters() if p.requires_grad)
         self.total_params += sum(p.numel() for p in self.policyNetwork.parameters() if p.requires_grad)
-        self.total_params += sum(p.numel() for p in self.img_fc.parameters() if p.requires_grad)
         print('Initialized SAC Baseline with',self.total_params,'parameters!\n')
 
     @torch.no_grad()
     def get_action(self, observation, deterministic=False):
         # img_feats = self.backbone.extractFeatures(observation)
-        # breakpoint()
-        observation = torch.FloatTensor(observation).reshape(-1, 3, observation.shape[1],observation.shape[2]).to(self.device)#.reshape(len(observation), -1).to(self.device)
+        observation = torch.FloatTensor(observation).reshape(len(observation), -1).to(self.device)
         img_feats = self.prelu(self.img_fc(observation))
         action, _ = self.policyNetwork(img_feats, deterministic, False)
         return action.squeeze().cpu().numpy()
@@ -123,9 +116,9 @@ class SACBaseline(nn.Module):
     def computeQTargets(self, sample):
         # (s, a, r, s', done)
         observation, action, reward, observation_new, done = sample
-        observation_new = torch.FloatTensor(observation_new).reshape(-1, 3, observation_new.shape[1],observation_new.shape[2]).to(self.device)#.reshape(len(observation_new),-1).to(self.device)
+        observation_new = torch.FloatTensor(observation_new).reshape(len(observation_new),-1).to(self.device)
         img_new_feats = self.prelu(self.img_fc(observation_new)) #self.backbone.extractFeatures(observation_new)
-        # breakpoint()
+
         #get the target action from the current policy
         action_new, log_pi_new = self.policyNetwork(img_new_feats)
 
@@ -148,9 +141,8 @@ class SACBaseline(nn.Module):
 
     def update(self, sample):
         observation, action, reward, observation_new, done = sample
-        observation = torch.FloatTensor(observation).reshape(-1, 3, observation.shape[1],observation.shape[2]).to(self.device)#.reshape(len(observation), -1).to(self.device)
+        observation = torch.FloatTensor(observation).reshape(len(observation), -1).to(self.device)
         img_feats = self.prelu(self.img_fc(observation)) #self.backbone.extractFeatures(observation)
-        # breakpoint()
         action = torch.FloatTensor(action)
         action = action.to(self.device)
 
