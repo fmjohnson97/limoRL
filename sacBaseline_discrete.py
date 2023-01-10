@@ -13,8 +13,9 @@ import numpy as np
 from PIL import Image
 from copy import deepcopy
 from torchvision.models import feature_extraction, resnet18, ResNet18_Weights
-from torch.nn import Linear, PReLU, Sigmoid, Tanh
+from torch.nn import Linear, PReLU, Sigmoid, Tanh, Conv2d, ReLU
 from torch.distributions.normal import Normal
+from torch.distributions.categorical import Categorical
 from matplotlib import pyplot as plt
 
 
@@ -54,11 +55,13 @@ def weights_init_(m):
         torch.nn.init.xavier_uniform_(m.weight, gain=1)
         torch.nn.init.constant_(m.bias, 0)
 
+class Flatten(nn.Module):
+    def forward(self, x):
+        return x.view(x.size(0), -1)
 
 class SACBaseline(nn.Module):
-    def __init__(self, args, backbone, action_dim, action_limit, device):
+    def __init__(self, args, backbone, action_dim, device):
         super(SACBaseline, self).__init__()
-        #TODO: try discrete action space
         #TODO: try value based method instead?
         #TODO: learning schedule
         #TODO: alpha schedule
@@ -68,16 +71,19 @@ class SACBaseline(nn.Module):
         self.backbone=backbone
         # initialize networks
         # note: all using a shared feature extractor which isn't getting any loss backprop-ed
-        feat_dim= 2048#512 * 7 * 7
-        self.img_fc = Linear(96*96*3,feat_dim).to(device)
-        self.prelu = PReLU().to(device)
+        feat_dim= 512 * 7 * 7 # cnn 4096# fc 2048 # resnet 512 * 7 * 7
+        # self.img_fc = Linear(96*96*3,feat_dim).to(device)
+        # self.img_fc = nn.Sequential(Conv2d(3, 32, kernel_size=8, stride=4, padding=0), ReLU(),
+        #                             Conv2d(32, 64, kernel_size=4, stride=2, padding=0), ReLU(),
+        #                             Conv2d(64, 64, kernel_size=3, stride=1, padding=0), Flatten()).to(device)
+        # self.prelu = PReLU().to(device)
         self.q1network = QNetwork(feat_dim, action_dim).to(device)
         self.targetQ1 = deepcopy(self.q1network)
         self.targetQ1 = self.targetQ1.to(device)
         self.q2network = QNetwork(feat_dim, action_dim).to(device)
         self.targetQ2 = deepcopy(self.q2network)
         self.targetQ2 = self.targetQ2.to(device)
-        self.policyNetwork = PolicyNetwork(args, feat_dim, action_dim, action_limit).to(device)
+        self.policyNetwork = PolicyNetwork(args, feat_dim, action_dim).to(device)
 
         # gathering hyperparameters
         self.gamma = args.gamma
@@ -102,55 +108,61 @@ class SACBaseline(nn.Module):
         self.total_params = sum(p.numel() for p in self.q1network.parameters() if p.requires_grad)
         self.total_params += sum(p.numel() for p in self.q2network.parameters() if p.requires_grad)
         self.total_params += sum(p.numel() for p in self.policyNetwork.parameters() if p.requires_grad)
+        # self.total_params += sum(p.numel() for p in self.img_fc.parameters() if p.requires_grad)
         print('Initialized SAC Baseline with',self.total_params,'parameters!\n')
 
     @torch.no_grad()
     def get_action(self, observation, deterministic=False):
-        # img_feats = self.backbone.extractFeatures(observation)
-        observation = torch.FloatTensor(observation).reshape(len(observation), -1).to(self.device)
-        img_feats = self.prelu(self.img_fc(observation))
-        action, _ = self.policyNetwork(img_feats, deterministic, False)
+        # observation = torch.FloatTensor(observation).reshape(-1, 3, observation.shape[1],observation.shape[2]).to(self.device)#.reshape(len(observation), -1).to(self.device)
+        img_feats = self.backbone.extractFeatures(observation)
+        # img_feats = self.prelu(self.img_fc(observation))
+        action_dist, action, log_action = self.policyNetwork(img_feats)
+        # breakpoint()
+        action = action.argmax(-1)
         return action.squeeze().cpu().numpy()
 
     @torch.no_grad()
     def computeQTargets(self, sample):
         # (s, a, r, s', done)
         observation, action, reward, observation_new, done = sample
-        observation_new = torch.FloatTensor(observation_new).reshape(len(observation_new),-1).to(self.device)
-        img_new_feats = self.prelu(self.img_fc(observation_new)) #self.backbone.extractFeatures(observation_new)
-
+        # observation_new = torch.FloatTensor(observation_new).reshape(-1, 3, observation_new.shape[1],observation_new.shape[2]).to(self.device)#.reshape(len(observation_new),-1).to(self.device)
+        img_new_feats = self.backbone.extractFeatures(observation_new) #self.prelu(self.img_fc(observation_new)) #
+        # breakpoint()
         #get the target action from the current policy
-        action_new, log_pi_new = self.policyNetwork(img_new_feats)
+        action_dist_new, action_new, log_action_new = self.policyNetwork(img_new_feats)
 
         #get target q values
         targetq1_out = self.targetQ1(img_new_feats, action_new)
         targetq2_out = self.targetQ2(img_new_feats, action_new)
         q_targ_out = torch.min(targetq1_out, targetq2_out)
 
-        q_target = torch.FloatTensor(reward.reshape(len(reward), 1) + self.gamma * (1-done).reshape(len(done),1) * (q_targ_out.cpu().numpy() - self.alpha * log_pi_new.cpu().numpy()))
-        q_target = q_target.to(self.device)
+        q_target = torch.FloatTensor(reward + self.gamma * (1-done) * np.sum((q_targ_out.cpu().numpy() - self.alpha * log_action_new.cpu().numpy())*action_new.cpu().numpy(), axis=-1))#TODO: ???
+        q_target = q_target.reshape(len(q_target),-1).to(self.device)
         return q_target
 
     def computePolicyLoss(self, img_feats):
-        pi_action, log_pi_action = self.policyNetwork(img_feats)
-        q1_policy = self.q1network(img_feats, pi_action)
-        q2_policy = self.q2network(img_feats, pi_action)
+        action_dist, action, log_action = self.policyNetwork(img_feats)
+        q1_policy = self.q1network(img_feats, action)
+        q2_policy = self.q2network(img_feats, action)
         q_value = torch.min(q1_policy, q2_policy)
-        return self.pi_loss_func(q_value, self.alpha * log_pi_action)  #(q_value - self.alpha * log_pi_action).mean() # they use L1 loss for some reason???
-        # TODO: change ^^^ if this doesn't converge
+        # breakpoint()
+        return torch.sum((self.alpha * log_action - q_value)*action , axis=-1).mean()
+        #self.pi_loss_func(q_value, self.alpha * log_action)  #(q_value - self.alpha * log_pi_action).mean() # they use L1 loss for some reason???
 
     def update(self, sample):
         observation, action, reward, observation_new, done = sample
-        observation = torch.FloatTensor(observation).reshape(len(observation), -1).to(self.device)
-        img_feats = self.prelu(self.img_fc(observation)) #self.backbone.extractFeatures(observation)
+        # observation = torch.FloatTensor(observation).reshape(-1, 3, observation.shape[1],observation.shape[2]).to(self.device)#.reshape(len(observation), -1).to(self.device)
+        img_feats = self.backbone.extractFeatures(observation) #self.prelu(self.img_fc(observation)) #
+        # breakpoint()
         action = torch.FloatTensor(action)
         action = action.to(self.device)
 
         # compute q networks loss and backprop it
         self.q_opt.zero_grad()
         q_target = self.computeQTargets(sample)
-        q1_out = self.q1network(img_feats, action)
-        q2_out = self.q2network(img_feats, action)
+        # breakpoint()
+        q1_out = self.q1network(img_feats, action)[torch.where(action==1)].reshape(-1,1)
+        q2_out = self.q2network(img_feats, action)[torch.where(action==1)].reshape(-1,1)
         q1_loss = self.q_loss_func(q1_out, q_target)
         q2_loss = self.q_loss_func(q2_out, q_target)
         q_loss = q1_loss + q2_loss
@@ -204,7 +216,7 @@ class QNetwork(nn.Module):
         #pretrained feature extractor
         self.fc1=Linear(feat_dim + action_dim,feat_dim // 8)
         self.fc2 = Linear(feat_dim // 8, feat_dim // 64)
-        self.fc3 = Linear(feat_dim // 64, 1)
+        self.fc3 = Linear(feat_dim // 64, action_dim)
         self.prelu1 = PReLU()
         self.prelu2 = PReLU()
 
@@ -219,53 +231,31 @@ class QNetwork(nn.Module):
 
 
 class PolicyNetwork(nn.Module):
-    def __init__(self, args, feat_dim, action_dim, action_limit):
+    def __init__(self, args, feat_dim, action_dim):
         super(PolicyNetwork, self).__init__()
         # pretrained feature extractor
         self.fc1 = Linear(feat_dim, feat_dim // 8)
         self.fc2 = Linear(feat_dim // 8, feat_dim // 64)
+        self.logits = Linear(feat_dim // 64,action_dim)
         self.prelu1 = PReLU()
         self.prelu2 = PReLU()
-        self.mean = Linear(feat_dim // 64, action_dim)
-        self.log_std = Linear(feat_dim // 64, action_dim)
-        self.log_std_max = args.log_std_max
-        self.log_std_min = args.log_std_min
-        self.action_limit=action_limit[1]
-        self.action_limit_low=action_limit[0]
+        self.sigmoid = Sigmoid()
 
-        weights_init_(self.mean)
-        weights_init_(self.log_std)
         weights_init_(self.fc1)
         weights_init_(self.fc2)
+        weights_init_(self.logits)
 
-    def forward(self, img_feats, deterministic=False, withLogProb=True):
+    def forward(self, img_feats):
         #extracts features from the image observation
         feats = self.prelu1(self.fc1(img_feats))
         feats = self.prelu2(self.fc2(feats))
-        #Needs to output (1) the steering angle (between [-1,1]) and (2) whether to push the gas and (3) whether to push the break
-        # steering angle is continuous (so need mean and std output for probabilistic modeling)
-        # gas and break are disrecete (so sigmoid them to a boolean)
+        #Needs to output [0: do nothing, 1: steer left, 2: steer right, 3: gas, 4: brake]
+        logits = self.sigmoid(self.logits(feats))
 
-        mu = self.mean(feats)
-        log_std = torch.clamp(self.log_std(feats), self.log_std_min, self.log_std_max)
-        std = torch.exp(log_std)
-        pi_distribution = Normal(mu, std)
-        if deterministic:
-            # Only used for evaluating policy at test time.
-            pi_action = mu
-        else:
-            pi_action = pi_distribution.rsample()
+        z = logits == 0.0
+        z = z.float() * 1e-8
 
-        if withLogProb:
-            log_pi = pi_distribution.log_prob(pi_action).sum(axis=-1) - (2 * (np.log(2) - pi_action - nn.functional.softplus(-2 * pi_action))).sum(axis=1)
-            log_pi = log_pi.reshape(len(log_pi),1)
-        else:
-            log_pi = None
-
-        pi_action = torch.tanh(pi_action)
-        pi_action = self.action_limit * pi_action #Note: Assumes that the action space is symmetric about 0!!!!!
-
-        return pi_action, log_pi
+        return Categorical(logits), logits + z, torch.log(logits + z)
 
 
 class ReplayBuffer():
@@ -332,6 +322,9 @@ def train(args):
     #TODO: add win condition ending for training
     #TODO: test the model performance
 
+    torch.manual_seed(12345)
+    np.random.seed(12345)
+
     # make the resnet backbone
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     img_backbone = ResnetBackbone(device, args)
@@ -342,12 +335,10 @@ def train(args):
     # initialize enironment
     env=gym.make("CarRacing-v2",max_episode_steps=args.steps_per_epoch, render_mode = "rgb_array")#"human")#, domain_randomize=True
     # obs_dim = env.observation_space.shape
-    act_dim = env.action_space.shape[0] #there's 3: steering[-1,1], break, gas
-    act_limit_high = env.action_space.high[0]
-    act_limit_low = env.action_space.low[0]
+    act_dim = 5 #env.action_space.shape[0] #there's 3: steering[-1,1], break, gas
 
     #initialize networks/sac
-    sac = SACBaseline(args, img_backbone, act_dim, [act_limit_low, act_limit_high], device)
+    sac = SACBaseline(args, img_backbone, act_dim, device)
 
     # initial data collection
     observation, info = env.reset(seed=42)
@@ -361,9 +352,14 @@ def train(args):
     for step in range(args.steps_per_epoch * args.epochs): #TODO: determine how many updates you actually want to do
         if step < args.use_policy_step:
             # take random actions and add to the buffer (s, a, r, s', done)
-            action = env.action_space.sample()
+            # observation = torch.FloatTensor(observation).reshape(-1, 3, observation.shape[1], observation.shape[2]).to(device)
+            action_ind = random.randint(0,4)
+            action=np.zeros(act_dim)
+            action[action_ind]=1
         else:
-            action = sac.get_action(np.stack([observation]))
+            action_ind = sac.get_action(np.stack([observation]))
+            action = np.zeros(act_dim)
+            action[action_ind] = 1
             # frame = env.render()
             # plt.imshow(frame)
             # plt.pause(0.1)
