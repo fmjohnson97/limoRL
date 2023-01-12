@@ -170,7 +170,7 @@ class SACBaseline(nn.Module):
         q1_loss = self.q_loss_func(q1_out, q_target)
         q2_loss = self.q_loss_func(q2_out, q_target)
         q_loss = q1_loss + q2_loss
-        q_loss.backward(retain_graph=True)
+        q_loss.backward()#retain_graph=True)
         self.q_opt.step()
 
         # freeze q weights to ease policy network backprop computation
