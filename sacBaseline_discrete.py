@@ -26,14 +26,14 @@ def getArgs():
     parser.add_argument('--batch_size', type=int, default=32, help='number of samples used to update the networks at once')
     parser.add_argument('--epochs', type=int, default=100, help='number of epochs for training')
     parser.add_argument('--steps_per_epoch', type=int, default = 4000, help='max number of steps for each epoch')
-    parser.add_argument('--use_policy_step', type=int, default=20000, help='number of steps before using the learned policy')
-    parser.add_argument('--update_frequency', type=int, default=50)
+    parser.add_argument('--use_policy_step', type=int, default=800, help='number of steps before using the learned policy')
+    parser.add_argument('--update_frequency', type=int, default=15)
     parser.add_argument('--lr', type=float, default=1e-4, help='learning rate for training')
     parser.add_argument('--save_name', default=None, help='prefix name for saving the SAC networks')
 
     # buffer hyperparameters
     parser.add_argument('--buffer_limit', type=int, default=40000, help='max number of samples in the replay buffer')
-    parser.add_argument('--buffer_init_steps', type=int, default=4000, help='number of random actions to take before train loop')
+    parser.add_argument('--buffer_init_steps', type=int, default=400, help='number of random actions to take before train loop')
 
     # sac hyperparameters
     parser.add_argument('--gamma', type=float, default=0.99, help='discount factor for SAC RL')
@@ -68,10 +68,10 @@ class SACBaseline(nn.Module):
         #TODO: add save flag for networks
 
         self.device = device
-        self.backbone=backbone
+        # self.backbone=backbone
         # initialize networks
         # note: all using a shared feature extractor which isn't getting any loss backprop-ed
-        feat_dim= 512 * 7 * 7 # cnn 4096# fc 2048 # resnet 512 * 7 * 7
+        feat_dim= 2 # cnn 4096# fc 2048 # resnet 512 * 7 * 7
         # self.img_fc = Linear(96*96*3,feat_dim).to(device)
         # self.img_fc = nn.Sequential(Conv2d(3, 32, kernel_size=8, stride=4, padding=0), ReLU(),
         #                             Conv2d(32, 64, kernel_size=4, stride=2, padding=0), ReLU(),
@@ -114,9 +114,10 @@ class SACBaseline(nn.Module):
     @torch.no_grad()
     def get_action(self, observation, deterministic=False):
         # observation = torch.FloatTensor(observation).reshape(-1, 3, observation.shape[1],observation.shape[2]).to(self.device)#.reshape(len(observation), -1).to(self.device)
-        img_feats = self.backbone.extractFeatures(observation)
+        observation = torch.FloatTensor(observation).to(self.device)
+        # img_feats = self.backbone.extractFeatures(observation)
         # img_feats = self.prelu(self.img_fc(observation))
-        action_dist, action, log_action = self.policyNetwork(img_feats)
+        action_dist, action, log_action = self.policyNetwork(observation)#img_feats)
         # breakpoint()
         action = action.argmax(-1)
         return action.squeeze().cpu().numpy()
@@ -126,14 +127,15 @@ class SACBaseline(nn.Module):
         # (s, a, r, s', done)
         observation, action, reward, observation_new, done = sample
         # observation_new = torch.FloatTensor(observation_new).reshape(-1, 3, observation_new.shape[1],observation_new.shape[2]).to(self.device)#.reshape(len(observation_new),-1).to(self.device)
-        img_new_feats = self.backbone.extractFeatures(observation_new) #self.prelu(self.img_fc(observation_new)) #
+        # img_new_feats = self.backbone.extractFeatures(observation_new) #self.prelu(self.img_fc(observation_new)) #
         # breakpoint()
         #get the target action from the current policy
-        action_dist_new, action_new, log_action_new = self.policyNetwork(img_new_feats)
+        observation_new = torch.FloatTensor(observation_new).to(self.device)
+        action_dist_new, action_new, log_action_new = self.policyNetwork(observation_new)#img_new_feats)
 
         #get target q values
-        targetq1_out = self.targetQ1(img_new_feats, action_new)
-        targetq2_out = self.targetQ2(img_new_feats, action_new)
+        targetq1_out = self.targetQ1(observation_new, action_new) #img_new_feats, action_new)
+        targetq2_out = self.targetQ2(observation_new, action_new) #img_new_feats, action_new)
         q_targ_out = torch.min(targetq1_out, targetq2_out)
 
         q_target = torch.FloatTensor(reward + self.gamma * (1-done) * np.sum((q_targ_out.cpu().numpy() - self.alpha * log_action_new.cpu().numpy())*action_new.cpu().numpy(), axis=-1))#TODO: ???
@@ -141,28 +143,28 @@ class SACBaseline(nn.Module):
         return q_target
 
     def computePolicyLoss(self, img_feats):
+        # breakpoint()
         action_dist, action, log_action = self.policyNetwork(img_feats)
         q1_policy = self.q1network(img_feats, action)
         q2_policy = self.q2network(img_feats, action)
         q_value = torch.min(q1_policy, q2_policy)
-        # breakpoint()
         return torch.sum((self.alpha * log_action - q_value)*action , axis=-1).mean()
         #self.pi_loss_func(q_value, self.alpha * log_action)  #(q_value - self.alpha * log_pi_action).mean() # they use L1 loss for some reason???
 
     def update(self, sample):
+        # breakpoint()
         observation, action, reward, observation_new, done = sample
         # observation = torch.FloatTensor(observation).reshape(-1, 3, observation.shape[1],observation.shape[2]).to(self.device)#.reshape(len(observation), -1).to(self.device)
-        img_feats = self.backbone.extractFeatures(observation) #self.prelu(self.img_fc(observation)) #
-        # breakpoint()
-        action = torch.FloatTensor(action)
+        # img_feats = self.backbone.extractFeatures(observation) #self.prelu(self.img_fc(observation)) #
+        observation = torch.FloatTensor(observation).to(self.device)
+        action = torch.FloatTensor(action)#.reshape(-1,1)
         action = action.to(self.device)
 
         # compute q networks loss and backprop it
         self.q_opt.zero_grad()
         q_target = self.computeQTargets(sample)
-        # breakpoint()
-        q1_out = self.q1network(img_feats, action)[torch.where(action==1)].reshape(-1,1)
-        q2_out = self.q2network(img_feats, action)[torch.where(action==1)].reshape(-1,1)
+        q1_out = self.q1network(observation, action)[torch.where(action==1)].reshape(-1,1) #img_feats
+        q2_out = self.q2network(observation, action)[torch.where(action==1)].reshape(-1,1) #img_feats
         q1_loss = self.q_loss_func(q1_out, q_target)
         q2_loss = self.q_loss_func(q2_out, q_target)
         q_loss = q1_loss + q2_loss
@@ -175,10 +177,10 @@ class SACBaseline(nn.Module):
         for param in self.q2network.parameters():
             param.requires_grad = False
 
-
+        # breakpoint()
         # compute policy network loss and backprop it
         self.policy_opt.zero_grad()
-        policy_loss = self.computePolicyLoss(img_feats)
+        policy_loss = self.computePolicyLoss(observation)#img_feats)
         policy_loss.backward()
         self.policy_opt.step()
 
@@ -201,9 +203,9 @@ class SACBaseline(nn.Module):
 
     def save_models(self,name):
         if name is None:
-            torch.save(self.q1network.state_dict(), 'sacBaseline_q1.pt')
-            torch.save(self.q2network.state_dict(), 'sacBaseline_q2.pt')
-            torch.save(self.policyNetwork.state_dict(), 'sacBaseline_policy.pt')
+            torch.save(self.q1network.state_dict(), 'sacBaselineDisc_q1.pt')
+            torch.save(self.q2network.state_dict(), 'sacBaselineDisc_q2.pt')
+            torch.save(self.policyNetwork.state_dict(), 'sacBaselineDisc_policy.pt')
         else:
             torch.save(self.q1network.state_dict(), name+'_q1.pt')
             torch.save(self.q2network.state_dict(), name+'_q2.pt')
@@ -214,43 +216,48 @@ class QNetwork(nn.Module):
     def __init__(self, feat_dim, action_dim):
         super(QNetwork, self).__init__()
         #pretrained feature extractor
-        self.fc1=Linear(feat_dim + action_dim,feat_dim // 8)
-        self.fc2 = Linear(feat_dim // 8, feat_dim // 64)
-        self.fc3 = Linear(feat_dim // 64, action_dim)
+        # self.fc1=Linear(feat_dim + action_dim,feat_dim // 8)
+        # self.fc2 = Linear(feat_dim // 8, feat_dim // 64)
+        # self.fc3 = Linear(feat_dim // 64, action_dim)
+        self.fc1=Linear(feat_dim + action_dim,feat_dim)
+        self.fc2 = Linear(feat_dim, action_dim)
         self.prelu1 = PReLU()
-        self.prelu2 = PReLU()
+        # self.prelu2 = PReLU()
 
         weights_init_(self.fc1)
         weights_init_(self.fc2)
-        weights_init_(self.fc3)
+        # weights_init_(self.fc3)
 
     def forward(self, img_feats, action):
         feats = self.prelu1(self.fc1(torch.cat((img_feats, action), axis=-1)))
-        feats = self.prelu2(self.fc2(feats))
-        return self.fc3(feats)
+        # feats = self.prelu2(self.fc2(feats))
+        return self.fc2(feats)
 
 
 class PolicyNetwork(nn.Module):
     def __init__(self, args, feat_dim, action_dim):
         super(PolicyNetwork, self).__init__()
         # pretrained feature extractor
-        self.fc1 = Linear(feat_dim, feat_dim // 8)
-        self.fc2 = Linear(feat_dim // 8, feat_dim // 64)
-        self.logits = Linear(feat_dim // 64,action_dim)
+        # self.fc1 = Linear(feat_dim, feat_dim // 8)
+        # self.fc2 = Linear(feat_dim // 8, feat_dim // 64)
+        # self.logits = Linear(feat_dim // 64,action_dim)
+        self.fc1 = Linear(feat_dim , feat_dim )
+        self.fc2 = Linear(feat_dim , action_dim)
         self.prelu1 = PReLU()
-        self.prelu2 = PReLU()
+        # self.prelu2 = PReLU()
         self.sigmoid = Sigmoid()
 
         weights_init_(self.fc1)
         weights_init_(self.fc2)
-        weights_init_(self.logits)
+        # weights_init_(self.logits)
 
     def forward(self, img_feats):
         #extracts features from the image observation
         feats = self.prelu1(self.fc1(img_feats))
-        feats = self.prelu2(self.fc2(feats))
+        logits = self.sigmoid(self.fc2(feats))
+        # feats = self.prelu2(self.fc2(feats))
         #Needs to output [0: do nothing, 1: steer left, 2: steer right, 3: gas, 4: brake]
-        logits = self.sigmoid(self.logits(feats))
+        # logits = self.sigmoid(self.logits(feats))
 
         z = logits == 0.0
         z = z.float() * 1e-8
@@ -333,9 +340,10 @@ def train(args):
     replay_buffer=ReplayBuffer(args)
 
     # initialize enironment
-    env=gym.make("CarRacing-v2",max_episode_steps=args.steps_per_epoch, render_mode = "rgb_array")#"human")#, domain_randomize=True
+    # env=gym.make("CarRacing-v2",max_episode_steps=args.steps_per_epoch, render_mode = "rgb_array")#"human")#, domain_randomize=True
+    env = gym.make('MountainCar-v0', render_mode = "human")#"rgb_array")#, domain_randomize=True
     # obs_dim = env.observation_space.shape
-    act_dim = 5 #env.action_space.shape[0] #there's 3: steering[-1,1], break, gas
+    act_dim = 3 #env.action_space.shape[0] #there's 3: steering[-1,1], break, gas
 
     #initialize networks/sac
     sac = SACBaseline(args, img_backbone, act_dim, device)
@@ -347,19 +355,21 @@ def train(args):
     ep_count=0
     total_qloss = 0
     total_policyloss = 0
-
+    task_completed = 0
     ## train loop
     for step in range(args.steps_per_epoch * args.epochs): #TODO: determine how many updates you actually want to do
         if step < args.use_policy_step:
             # take random actions and add to the buffer (s, a, r, s', done)
             # observation = torch.FloatTensor(observation).reshape(-1, 3, observation.shape[1], observation.shape[2]).to(device)
-            action_ind = random.randint(0,4)
-            action=np.zeros(act_dim)
-            action[action_ind]=1
+            # action_ind = random.randint(0,act_dim-1)
+            # action=np.zeros(act_dim)
+            # action[action_ind]=1
+            action = random.randint(0,act_dim-1)
         else:
-            action_ind = sac.get_action(np.stack([observation]))
-            action = np.zeros(act_dim)
-            action[action_ind] = 1
+            # action_ind = sac.get_action(np.stack([observation]))
+            # action = np.zeros(act_dim)
+            # action[action_ind] = 1
+            action = sac.get_action(np.stack([observation]))
             # frame = env.render()
             # plt.imshow(frame)
             # plt.pause(0.1)
@@ -371,10 +381,17 @@ def train(args):
         # add to buffer
         d = terminated or truncated
         d = False if ep_len == args.steps_per_epoch else d #so that timing out isn't penalized
+        action_ind = action
+        action = np.zeros(act_dim)
+        action[action_ind] = 1
         replay_buffer.addSample([observation, action, reward, observation_new, d])
 
         #check if done else switch the observations
         if terminated or truncated or ep_len == args.steps_per_epoch:
+            if terminated:
+                task_completed+=0
+                if task_completed>=5:
+                    print("Learning Complete!!! Successfully solved the problem",task_completed,'times')
             observation, info = env.reset()
             ep_count+=1
             print('Episode',ep_count,'completed in',ep_len,'steps with',ep_reward,'reward!')
