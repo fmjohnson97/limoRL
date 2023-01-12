@@ -341,7 +341,7 @@ def train(args):
 
     # initialize enironment
     # env=gym.make("CarRacing-v2",max_episode_steps=args.steps_per_epoch, render_mode = "rgb_array")#"human")#, domain_randomize=True
-    env = gym.make('MountainCar-v0', render_mode = "human")#"rgb_array")#, domain_randomize=True
+    env = gym.make('MountainCar-v0', render_mode = "rgb_array")#"human")#, domain_randomize=True
     # obs_dim = env.observation_space.shape
     act_dim = 3 #env.action_space.shape[0] #there's 3: steering[-1,1], break, gas
 
