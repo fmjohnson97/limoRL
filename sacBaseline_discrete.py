@@ -70,10 +70,10 @@ class SACBaseline(nn.Module):
         #TODO: add learned alpha
 
         self.device = device
-        # self.backbone=backbone
+        self.backbone=backbone
         # initialize networks
         # note: all using a shared feature extractor which isn't getting any loss backprop-ed
-        feat_dim= 2 # cnn 4096# fc 2048 # resnet 512 * 7 * 7
+        feat_dim= 512 * 7 * 7 # cnn 4096# fc 2048 # resnet 512 * 7 * 7
         # self.img_fc = Linear(96*96*3,feat_dim).to(device)
         # self.img_fc = nn.Sequential(Conv2d(3, 32, kernel_size=8, stride=4, padding=0), ReLU(),
         #                             Conv2d(32, 64, kernel_size=4, stride=2, padding=0), ReLU(),
@@ -116,10 +116,10 @@ class SACBaseline(nn.Module):
     @torch.no_grad()
     def get_action(self, observation, deterministic=False):
         # observation = torch.FloatTensor(observation).reshape(-1, 3, observation.shape[1],observation.shape[2]).to(self.device)#.reshape(len(observation), -1).to(self.device)
-        observation = torch.FloatTensor(observation).to(self.device)
-        # img_feats = self.backbone.extractFeatures(observation)
+        # observation = torch.FloatTensor(observation).to(self.device)
+        img_feats = self.backbone.extractFeatures(observation)
         # img_feats = self.prelu(self.img_fc(observation))
-        action_dist, action, log_action = self.policyNetwork(observation)#img_feats)
+        action_dist, action, log_action = self.policyNetwork(img_feats)
         # breakpoint()
         action = action.argmax(-1)
         return action.squeeze().cpu().numpy()
@@ -129,15 +129,15 @@ class SACBaseline(nn.Module):
         # (s, a, r, s', done)
         observation, action, reward, observation_new, done = sample
         # observation_new = torch.FloatTensor(observation_new).reshape(-1, 3, observation_new.shape[1],observation_new.shape[2]).to(self.device)#.reshape(len(observation_new),-1).to(self.device)
-        # img_new_feats = self.backbone.extractFeatures(observation_new) #self.prelu(self.img_fc(observation_new)) #
+        img_new_feats = self.backbone.extractFeatures(observation_new) #self.prelu(self.img_fc(observation_new)) #
         # breakpoint()
         #get the target action from the current policy
-        observation_new = torch.FloatTensor(observation_new).to(self.device)
-        action_dist_new, action_new, log_action_new = self.policyNetwork(observation_new)#img_new_feats)
+        # observation_new = torch.FloatTensor(observation_new).to(self.device)
+        action_dist_new, action_new, log_action_new = self.policyNetwork(img_new_feats)
 
         #get target q values
-        targetq1_out = self.targetQ1(observation_new, action_new) #img_new_feats, action_new)
-        targetq2_out = self.targetQ2(observation_new, action_new) #img_new_feats, action_new)
+        targetq1_out = self.targetQ1(img_new_feats, action_new)
+        targetq2_out = self.targetQ2(img_new_feats, action_new)
         q_targ_out = torch.min(targetq1_out, targetq2_out)
 
         q_target = torch.FloatTensor(reward + self.gamma * (1-done) * np.sum((q_targ_out.cpu().numpy() - self.alpha * log_action_new.cpu().numpy())*action_new.cpu().numpy(), axis=-1))#TODO: ???
@@ -157,16 +157,16 @@ class SACBaseline(nn.Module):
         # breakpoint()
         observation, action, reward, observation_new, done = sample
         # observation = torch.FloatTensor(observation).reshape(-1, 3, observation.shape[1],observation.shape[2]).to(self.device)#.reshape(len(observation), -1).to(self.device)
-        # img_feats = self.backbone.extractFeatures(observation) #self.prelu(self.img_fc(observation)) #
-        observation = torch.FloatTensor(observation).to(self.device)
+        img_feats = self.backbone.extractFeatures(observation) #self.prelu(self.img_fc(observation)) #
+        # observation = torch.FloatTensor(observation).to(self.device)
         action = torch.FloatTensor(action)#.reshape(-1,1)
         action = action.to(self.device)
 
         # compute q networks loss and backprop it
         self.q_opt.zero_grad()
         q_target = self.computeQTargets(sample)
-        q1_out = self.q1network(observation, action)[torch.where(action==1)].reshape(-1,1) #img_feats
-        q2_out = self.q2network(observation, action)[torch.where(action==1)].reshape(-1,1) #img_feats
+        q1_out = self.q1network(img_feats, action)[torch.where(action==1)].reshape(-1,1) #
+        q2_out = self.q2network(img_feats, action)[torch.where(action==1)].reshape(-1,1) #
         q1_loss = self.q_loss_func(q1_out, q_target)
         q2_loss = self.q_loss_func(q2_out, q_target)
         q_loss = q1_loss + q2_loss
@@ -182,7 +182,7 @@ class SACBaseline(nn.Module):
         # breakpoint()
         # compute policy network loss and backprop it
         self.policy_opt.zero_grad()
-        policy_loss = self.computePolicyLoss(observation)#img_feats)
+        policy_loss = self.computePolicyLoss(img_feats)
         policy_loss.backward()
         self.policy_opt.step()
 
@@ -218,48 +218,49 @@ class QNetwork(nn.Module):
     def __init__(self, feat_dim, action_dim):
         super(QNetwork, self).__init__()
         #pretrained feature extractor
-        # self.fc1=Linear(feat_dim + action_dim,feat_dim // 8)
-        # self.fc2 = Linear(feat_dim // 8, feat_dim // 64)
-        # self.fc3 = Linear(feat_dim // 64, action_dim)
-        self.fc1=Linear(feat_dim + action_dim,feat_dim)
-        self.fc2 = Linear(feat_dim, action_dim)
-        self.prelu1 = PReLU()
-        # self.prelu2 = PReLU()
+        self.fc1=Linear(feat_dim + action_dim,feat_dim // 8)
+        self.fc2 = Linear(feat_dim // 8, feat_dim // 64)
+        self.fc3 = Linear(feat_dim // 64, action_dim)
 
-        weights_init_(self.fc1)
-        weights_init_(self.fc2)
+        # self.fc1=Linear(feat_dim + action_dim,feat_dim)
+        # self.fc2 = Linear(feat_dim, action_dim)
+        self.prelu1 = ReLU()
+        self.prelu2 = ReLU()
+
+        # weights_init_(self.fc1)
+        # weights_init_(self.fc2)
         # weights_init_(self.fc3)
 
     def forward(self, img_feats, action):
         feats = self.prelu1(self.fc1(torch.cat((img_feats, action), axis=-1)))
-        # feats = self.prelu2(self.fc2(feats))
-        return self.fc2(feats)
+        feats = self.prelu2(self.fc2(feats))
+        return self.fc3(feats)
 
 
 class PolicyNetwork(nn.Module):
     def __init__(self, args, feat_dim, action_dim):
         super(PolicyNetwork, self).__init__()
-        # pretrained feature extractor
-        # self.fc1 = Linear(feat_dim, feat_dim // 8)
-        # self.fc2 = Linear(feat_dim // 8, feat_dim // 64)
-        # self.logits = Linear(feat_dim // 64,action_dim)
-        self.fc1 = Linear(feat_dim , feat_dim )
-        self.fc2 = Linear(feat_dim , action_dim)
-        self.prelu1 = PReLU()
-        # self.prelu2 = PReLU()
+        self.fc1 = Linear(feat_dim, feat_dim // 8)
+        self.fc2 = Linear(feat_dim // 8, feat_dim // 64)
+        self.logits = Linear(feat_dim // 64,action_dim)
+
+        # self.fc1 = Linear(feat_dim , feat_dim )
+        # self.fc2 = Linear(feat_dim , action_dim)
+        self.prelu1 = ReLU()
+        self.prelu2 = ReLU()
         self.sigmoid = Sigmoid()
 
-        weights_init_(self.fc1)
-        weights_init_(self.fc2)
+        # weights_init_(self.fc1)
+        # weights_init_(self.fc2)
         # weights_init_(self.logits)
 
     def forward(self, img_feats):
         #extracts features from the image observation
         feats = self.prelu1(self.fc1(img_feats))
-        logits = self.sigmoid(self.fc2(feats))
-        # feats = self.prelu2(self.fc2(feats))
+        # logits = self.sigmoid(self.fc2(feats))
+        feats = self.prelu2(self.fc2(feats))
         #Needs to output [0: do nothing, 1: steer left, 2: steer right, 3: gas, 4: brake]
-        # logits = self.sigmoid(self.logits(feats))
+        logits = self.sigmoid(self.logits(feats))
 
         z = logits == 0.0
         z = z.float() * 1e-8
@@ -331,8 +332,8 @@ def train(args):
     #TODO: add win condition ending for training
     #TODO: test the model performance
 
-    torch.manual_seed(12345)
-    np.random.seed(12345)
+    torch.manual_seed(42)
+    np.random.seed(42)
 
     # make the resnet backbone
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -342,10 +343,10 @@ def train(args):
     replay_buffer=ReplayBuffer(args)
 
     # initialize enironment
-    # env=gym.make("CarRacing-v2",max_episode_steps=args.steps_per_epoch, render_mode = "rgb_array")#"human")#, domain_randomize=True
-    env = gym.make('MountainCar-v0', render_mode = "rgb_array")#"human")#, domain_randomize=True
+    env=gym.make("CarRacing-v2",max_episode_steps=args.steps_per_epoch, render_mode = "rgb_array")#"human")#, domain_randomize=True
+    # env = gym.make('MountainCar-v0', render_mode = "rgb_array")#"human")#, domain_randomize=True
     # obs_dim = env.observation_space.shape
-    act_dim = 3 #env.action_space.shape[0] #there's 3: steering[-1,1], break, gas
+    act_dim = 5 #env.action_space.shape[0] #there's 3: steering[-1,1], break, gas
 
     #initialize networks/sac
     sac = SACBaseline(args, img_backbone, act_dim, device)
@@ -363,10 +364,10 @@ def train(args):
         if step < args.use_policy_step:
             # take random actions and add to the buffer (s, a, r, s', done)
             # observation = torch.FloatTensor(observation).reshape(-1, 3, observation.shape[1], observation.shape[2]).to(device)
-            # action_ind = random.randint(0,act_dim-1)
-            # action=np.zeros(act_dim)
-            # action[action_ind]=1
-            action = random.randint(0,act_dim-1)
+            action_ind = random.randint(0,act_dim-1)
+            action=np.zeros(act_dim)
+            action[action_ind]=1
+            # action = random.randint(0,act_dim-1)
         else:
             # action_ind = sac.get_action(np.stack([observation]))
             # action = np.zeros(act_dim)
@@ -383,9 +384,9 @@ def train(args):
         # add to buffer
         d = terminated or truncated
         d = False if ep_len == args.steps_per_epoch else d #so that timing out isn't penalized
-        action_ind = action
-        action = np.zeros(act_dim)
-        action[action_ind] = 1
+        # action_ind = action
+        # action = np.zeros(act_dim)
+        # action[action_ind] = 1
         replay_buffer.addSample([observation, action, reward, observation_new, d])
 
         #check if done else switch the observations
