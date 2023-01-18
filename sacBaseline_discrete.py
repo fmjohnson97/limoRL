@@ -153,7 +153,7 @@ class SACBaseline(nn.Module):
         return torch.sum((self.alpha * log_action - q_value)*action , axis=-1).mean()
         #self.pi_loss_func(q_value, self.alpha * log_action)  #(q_value - self.alpha * log_pi_action).mean() # they use L1 loss for some reason???
 
-    def update(self, sample):
+    def update(self, sample, iteration):
         # breakpoint()
         observation, action, reward, observation_new, done = sample
         # observation = torch.FloatTensor(observation).reshape(-1, 3, observation.shape[1],observation.shape[2]).to(self.device)#.reshape(len(observation), -1).to(self.device)
@@ -186,20 +186,21 @@ class SACBaseline(nn.Module):
         policy_loss.backward()
         self.policy_opt.step()
 
+        if iteration % 50 == 0:
+            #update target q networks; done before grad turned back on so no loss props to the target networks
+            with torch.no_grad():
+                for param, targ_param in zip(self.q1network.parameters(), self.targetQ1.parameters()):
+                    targ_param.data.mul_(self.polyak)
+                    targ_param.data.add_((1 - self.polyak) * param.data)
+                for param, targ_param in zip(self.q2network.parameters(), self.targetQ2.parameters()):
+                    targ_param.data.mul_(self.polyak)
+                    targ_param.data.add_((1 - self.polyak) * param.data)
+
         # turn grad back on for the q networks
         for param in self.q1network.parameters():
             param.requires_grad = True
         for param in self.q2network.parameters():
             param.requires_grad = True
-
-        #update target q networks; done before grad turned back on so no loss props to the target networks
-        with torch.no_grad():
-            for param, targ_param in zip(self.q1network.parameters(), self.targetQ1.parameters()):
-                targ_param.data.mul_(self.polyak)
-                targ_param.data.add_((1 - self.polyak) * param.data)
-            for param, targ_param in zip(self.q2network.parameters(), self.targetQ2.parameters()):
-                targ_param.data.mul_(self.polyak)
-                targ_param.data.add_((1 - self.polyak) * param.data)
 
         return q_loss.item(), policy_loss.item()
 
@@ -416,7 +417,7 @@ def train(args):
             sample = replay_buffer.sample() #(s, a, r, s', done)
 
             # do the q and policy updates
-            qloss, policyloss = sac.update(sample)
+            qloss, policyloss = sac.update(sample, step)
             total_qloss+=qloss
             total_policyloss+=policyloss
 
