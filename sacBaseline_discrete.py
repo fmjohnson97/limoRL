@@ -370,10 +370,10 @@ def train(args):
             action[action_ind]=1
             # action = random.randint(0,act_dim-1)
         else:
-            # action_ind = sac.get_action(np.stack([observation]))
-            # action = np.zeros(act_dim)
-            # action[action_ind] = 1
-            action = sac.get_action(np.stack([observation]))
+            action_ind = sac.get_action(np.stack([observation]))
+            action = np.zeros(act_dim)
+            action[action_ind] = 1
+            # action = sac.get_action(np.stack([observation]))
             # frame = env.render()
             # plt.imshow(frame)
             # plt.pause(0.1)
