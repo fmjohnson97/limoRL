@@ -1,6 +1,8 @@
 import numpy as np
 import json
 
+from glob import glob
+
 class Graph():
     def __init__(self, config_path=None, config=None):
         if config is None or type(config)!=dict:
@@ -22,11 +24,13 @@ class Graph():
         # theta = 0/360. all angles are listed in degrees (not radians) and assuming the robot is facing theta = 0
         # and turning clockwise to get to Y
         # and the distance d (*approximate* but close enough) between the vertices in feet
-        self.transition_directions = self.config['transition_directions']
-        self.weights = None #TODO: is this just going to be the thing in the vertices list? or will this help with navigation/path planning?
+        self.weights = [None]*int(self.config['num_vertices']) #TODO: is this just going to be the thing in the vertices list? or will this help with navigation/path planning?
 
     def populateVertices(self, num_vertices, videoPath, videoExtension):
-        pass
+        videos = glob(videoPath+'*')
+        for i in range(num_vertices):
+            if videoPath+'node'+str(i+1)+videoExtension in videos:
+                self.vertices[i]=videoPath+'node'+str(i+1)+videoExtension
 
     def makeEdgeTable(self, transition_list):
         # TODO: should we put edges between the nodes and themselves? and choosing to stay means you're identifying you're in
@@ -37,7 +41,7 @@ class Graph():
                 self.edges[transition[0]-1,transition[1]-1] = 1
 
     def getReachableVertices(self, current_node):
-        pass
+        return [x[1] for x in self.config['transitions'][current_node-1]]
 
     def addNode(self, nodeFeatures=None, nodeFeatPath=None):
         if nodeFeatures is None:

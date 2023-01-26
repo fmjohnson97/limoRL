@@ -1,5 +1,5 @@
 {
-  "videoPath" : "~/GitRepos/limoRL/nodeVideos",
+  "videoPath" : "nodeVideos/",
   "videoExtension" : ".mp4",
   "num_vertices": 39,
   "transitions" : [[[1,2,236,1.803],[1,3,124,1.803],[1,4,180,2]],
