@@ -43,6 +43,10 @@ class Graph():
     def getReachableVertices(self, current_node):
         return [x[1] for x in self.config['transitions'][current_node-1]]
 
+    def getVertexFeats(self, vertex_num):
+        #ToDo: actually read the images/videos here
+        return self.vertices[vertex_num-1]
+
     def addNode(self, nodeFeatures=None, nodeFeatPath=None):
         if nodeFeatures is None:
             if nodeFeatPath is None:
@@ -70,5 +74,5 @@ class Graph():
         self.edges[node2Num-1, node1Num-1] = 0
 
 if __name__ == '__main__':
-    graph = Graph(config_path='config.json')
+    graph = Graph(config_path='labGraphConfig.json')
     breakpoint()

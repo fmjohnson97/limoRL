@@ -186,7 +186,7 @@ class SACBaseline(nn.Module):
         policy_loss.backward()
         self.policy_opt.step()
 
-        if iteration % 50 == 0:
+        if iteration % 25 == 0:
             #update target q networks; done before grad turned back on so no loss props to the target networks
             with torch.no_grad():
                 for param, targ_param in zip(self.q1network.parameters(), self.targetQ1.parameters()):

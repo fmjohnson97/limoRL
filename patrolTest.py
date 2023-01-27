@@ -61,14 +61,20 @@ limo.EnableCommand()
 #     limo.SetMotionCommand(linear_vel=-0.1,angular_vel=0.01, steering_angle=30)
 #     time.sleep(0.1)
 
-for i in range(50):
-    limo.SetMotionCommand(linear_vel=-0.1,steering_angle=0)
-    time.sleep(0.1)
+# for i in range(50):
+#     limo.SetMotionCommand(linear_vel=-0.1,steering_angle=0)
+#     time.sleep(0.1)
+#
+# for i in range(50):
+#     limo.SetMotionCommand(linear_vel=-0.1,steering_angle=60)
+#     time.sleep(0.1)
+#
+# for i in range(50):
+#     limo.SetMotionCommand(linear_vel=-0.1, steering_angle=-60)
+#     time.sleep(0.1)
 
-for i in range(50):
-    limo.SetMotionCommand(linear_vel=-0.1,steering_angle=60)
-    time.sleep(0.1)
+'''
+Atomic actions: forwards/backwards/off; continuous angle space
+TODO: How to get readings from LiDAR, anything else, programmatically
+'''
 
-for i in range(50):
-    limo.SetMotionCommand(linear_vel=-0.1, steering_angle=-60)
-    time.sleep(0.1)
