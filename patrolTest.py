@@ -38,8 +38,8 @@ limo.EnableCommand()
 # steering_angle:(float) ackerman
 
 #go straight example
-# limo.SetMotionCommand(linear_vel=0.1,angular_vel=-0.01)
-# time.sleep(5)
+limo.SetMotionCommand(linear_vel=0.1,angular_vel=-0.01)
+time.sleep(5)
 
 # # left circle example
 # for i in range(50):
