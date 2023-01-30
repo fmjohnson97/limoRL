@@ -57,7 +57,7 @@ class ResnetBackbone():
         if type(img) != Image:
             for im in img:
                 if type(im)==torch.Tensor:
-                    im = Image.fromarray(im.numpy().astype(np.uint8))
+                    im = Image.fromarray(im.cpu().numpy().astype(np.uint8))
                 else:
                     im = Image.fromarray(im)
                 img_ext.append(torch.FloatTensor(self.preprocess(im)))
