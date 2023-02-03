@@ -6,6 +6,7 @@ import torch.optim as optim
 import numpy as np
 
 from torch.utils.data import DataLoader
+from sklearn.metrics import confusion_matrix
 
 from models import ResnetNodeClassifier
 from nodeContrastiveDataset import NodeContrastiveDataset
@@ -23,6 +24,7 @@ def getArgs():
     parser.add_argument('--hidden_feats', type=int, default=256, help='hidden feat dimension')
     parser.add_argument('--in_feats', type=int, default=25088, help='input feat dimension')
     parser.add_argument('--validate', action='store_true', help='validate data during training')
+    parser.add_argument('--test', action='store_true', help='only test on the model')
 
     # resnet backbone args
     parser.add_argument('--return_node', type=str, default='layer4', choices=['layer1','layer2','layer3','layer4'], help='resnet layer to return features from')
@@ -85,6 +87,8 @@ def train(args, device):
 def test(model, dataloader, device):
     loss_func = nn.BCELoss()
     test_loss = 0
+    predictions = []
+    truth = []
     for batch in dataloader:
         images, labels = batch
 
@@ -94,6 +98,14 @@ def test(model, dataloader, device):
         loss = loss_func(output, labels.to(device))
         test_loss += loss.item()
 
+        predictions.extend(output)
+        truth.extend(labels)
+
+    breakpoint()
+    matrix = confusion_matrix(torch.stack(truth).cpu().numpy(), torch.stack(predictions).cpu().numpy())
+    print('Confusion matrix:')
+    print(matrix)
+
     return test_loss
 
 
@@ -102,7 +114,12 @@ if __name__=='__main__':
     args = getArgs()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    model = train(args, device)
+    if args.test:
+        model = ResnetNodeClassifier(args, device)
+        model.load_state_dict(torch.load('simpleClassNode' + str(args.node_num) + '.pt', map_location=torch.device('cpu')))
+        model.eval()
+    else:
+        model = train(args, device)
 
     test_data = NodeContrastiveDataset(args.node_num, mode='val')
     test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=True, pin_memory=True)

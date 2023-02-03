@@ -46,15 +46,15 @@ class ResnetBackbone():
 
     @torch.no_grad()
     def extractFeatures(self, img):
-        if len(img.shape)>3:
+        if len(img.shape)>4:
             temp = img
             img = []
             for t in temp:
                 img.extend(t)
             img = torch.stack(img)
-
+        # breakpoint()
         img_ext=[]
-        if type(img) != Image:
+        if len(img.shape)==4 and type(img) != Image:
             for im in img:
                 if type(im)==torch.Tensor:
                     im = Image.fromarray(im.cpu().numpy().astype(np.uint8))
@@ -63,7 +63,8 @@ class ResnetBackbone():
                 img_ext.append(torch.FloatTensor(self.preprocess(im)))
             img_ext=torch.stack(img_ext).to(self.device)
         else:
-            img_ext=torch.FloatTensor(img).to(self.device)
+            # breakpoint()
+            img_ext=torch.FloatTensor(img).unsqueeze(0).to(self.device)
 
         features = self.feat_ext(img_ext)
         # breakpoint()
