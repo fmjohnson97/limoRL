@@ -60,9 +60,9 @@ class Graph():
             #TODO: this is slow; maybe make a dictionary inside the json file with angle:image name
             with open(self.vertices[vertex_num-1]+'labels.json') as f:
                 labels = json.load(f)
-                labels.pop('train')
-                labels.pop('val')
-                labels.pop('test')
+            labels.pop('train')
+            labels.pop('val')
+            labels.pop('test')
             for k,v in labels.items():
                 if abs(v[-1]-heading)<heading_threshold:
                     return Image.open(self.vertices[vertex_num-1]+'node'+str(vertex_num)+'_'+str(k)+self.config['photoExtension'])

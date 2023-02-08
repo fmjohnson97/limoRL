@@ -174,7 +174,7 @@ class SACDiscreteBaseline(nn.Module):
         q2_out = self.q2network(img_feats, action)[torch.where(action==1)].reshape(-1,1) #
         q1_loss = self.q_loss_func(q1_out, q_target)
         q2_loss = self.q_loss_func(q2_out, q_target)
-        q_loss = torch.clamp(q1_loss + q2_loss,10,-10)
+        q_loss = torch.clamp(q1_loss + q2_loss,1,-1) #TODO: determine how to fix besides reward clipping?
         q_loss.backward()#retain_graph=True)
         self.q_opt.step()
 
