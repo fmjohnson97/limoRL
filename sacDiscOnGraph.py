@@ -44,11 +44,15 @@ def train(args, device):
     for step in range(args.buffer_init_steps):
         action = random.choice(range(env.action_space))
         obs_new, reward, goal_info, done = env.step(action)
+        # transforming action to store it as a vector
         action_ind = action
         action = np.zeros(env.action_space)
         action[action_ind] = 1
+        # goal info is currently (start node,  star dir, goal node, goal dir)
+        # getting the goal images to save instead of the goal info (since that's really for debug purposes tbh)
+        goal_img = env.getImg(goal_info[-2], goal_info[-1])
         # sample of the shape (s, a, r, g, s', done)
-        replay_buffer.addSample([obs, action, reward, goal_info, obs_new, done])
+        replay_buffer.addSample([obs, action, reward, goal_img, obs_new, done])
         if reward == 1 or step % args.steps_per_epoch==0:
             env.randomInit()
             obs = env.getImg()
@@ -66,20 +70,27 @@ def train(args, device):
     ep_len = 0
     total_qloss = 0
     total_policyloss = 0
+    env.randomInit()
+    obs = env.getImg()
     for step in range(args.epochs*args.steps_per_epoch):
         # initial random action or use the learned policy
         if step < args.use_policy_step:
             action = random.choice(range(env.action_space))
         else:
-            action = model.get_action(np.stack([obs]))
+            goal_img = env.getImg()
+            action = model.get_action(np.stack([obs]), np.stack([goal_img]))
 
         # take action in the environment and save to replay/update trackers
         obs_new, reward, goal_info, done = env.step(action)
+        # storing the action as a vector
         action_ind = action
         action = np.zeros(env.action_space)
         action[action_ind] = 1
+        # goal info is currently (start node,  star dir, goal node, goal dir)
+        # getting the goal images to save instead of the goal info (since that's really for debug purposes tbh)
+        goal_img = env.getImg(goal_info[-2], goal_info[-1])
         # sample of the shape (s, a, r, g, s', done)
-        replay_buffer.addSample([obs, action, reward, goal_info, obs_new, done])
+        replay_buffer.addSample([obs, action, reward, goal_img, obs_new, done])
         ep_reward+=reward
         ep_len+=1
 
@@ -89,8 +100,9 @@ def train(args, device):
             env.randomInit()
             obs = env.getImg()
             print('Epoch',ep_count,'completed in',ep_len,'steps with reward =',ep_reward)
-            print('\t Total Q Loss:',total_qloss,'\t Avg Q Loss:',total_qloss/ep_len)
-            print('\t Total Policy Loss:',total_policyloss,'\t Avg Policy Loss:',total_policyloss/ep_len)
+            print('\t Total Q Loss:',total_qloss,' Avg Q Loss:',total_qloss/ep_len)
+            print('\t Total Policy Loss:',total_policyloss,' Avg Policy Loss:',total_policyloss/ep_len)
+            print()
             ep_len=0
             ep_reward=0
             total_qloss = 0
@@ -101,10 +113,10 @@ def train(args, device):
         else:
             obs = obs_new
 
-        #update model
-        #TODO: should we use this as a positive and negative example like Hindsight Experience Replay???
+        # update model
+        # TODO: should we use this as a positive and negative example like Hindsight Experience Replay???
 
-        #sample the buffer, do the q and policy updates, update trackers
+        # sample the buffer, do the q and policy updates, update trackers
         sample = replay_buffer.sample()  # (s, a, r, s', done)
         qloss, policyloss = model.update(sample)
         total_qloss += qloss

@@ -88,7 +88,7 @@ class SACDiscreteBaseline(nn.Module):
         self.backbone=backbone
         # initialize networks
         # note: all using a shared feature extractor which isn't getting any loss backprop-ed
-        feat_dim= 512 * 7 * 7 # cnn 4096# fc 2048 # resnet 512 * 7 * 7
+        feat_dim= 512 * 7 * 7 * 2 #*2 is for goal # cnn 4096# fc 2048 # resnet 512 * 7 * 7
         # self.img_fc = Linear(96*96*3,feat_dim).to(device)
         # self.img_fc = nn.Sequential(Conv2d(3, 32, kernel_size=8, stride=4, padding=0), ReLU(),
         #                             Conv2d(32, 64, kernel_size=4, stride=2, padding=0), ReLU(),
@@ -128,10 +128,11 @@ class SACDiscreteBaseline(nn.Module):
         print('Initialized SAC Baseline with',self.total_params,'parameters!\n')
 
     @torch.no_grad()
-    def get_action(self, observation):
+    def get_action(self, observation, goal_obs):
         # breakpoint()
         img_feats = self.backbone.extractFeatures(observation)
-        # img_feats = self.prelu(self.img_fc(observation))
+        goal_feats = self.backbone.extractFeatures(goal_obs)
+        img_feats = torch.cat((img_feats,goal_feats), axis=-1)
         action_dist, action, log_action = self.policyNetwork(img_feats)
         # breakpoint()
         action = action.argmax(-1)
@@ -141,8 +142,10 @@ class SACDiscreteBaseline(nn.Module):
     def computeQTargets(self, sample):
         # breakpoint()
         # (s, a, r, g, s', done)
-        observation, action, reward, goal_info, observation_new, done = sample
+        observation, action, reward, goal_imgs, observation_new, done = sample
         img_new_feats = self.backbone.extractFeatures(observation_new) #self.prelu(self.img_fc(observation_new)) #
+        goal_feats = self.backbone.extractFeatures(goal_imgs)
+        img_new_feats = torch.cat((img_new_feats, goal_feats), axis=-1)
         # print('imgnew',img_new_feats.mean())
         #get the target action from the current policy
         action_dist_new, action_new, log_action_new = self.policyNetwork(img_new_feats)
@@ -161,9 +164,11 @@ class SACDiscreteBaseline(nn.Module):
 
     def update(self, sample):
         # breakpoint()
-        observation, action, reward, goal_info, observation_new, done = sample
+        observation, action, reward, goal_imgs, observation_new, done = sample
         # print(goal_info)
         img_feats = self.backbone.extractFeatures(observation) #self.prelu(self.img_fc(observation)) #
+        goal_feats = self.backbone.extractFeatures(goal_imgs)
+        img_feats = torch.cat((img_feats,goal_feats), axis=-1)
         action = torch.FloatTensor(action)#.reshape(-1,1)
         action = action.to(self.device)
 
