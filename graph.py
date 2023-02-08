@@ -1,5 +1,6 @@
-import numpy as np
+import time
 import json
+import numpy as np
 
 from glob import glob
 from pynput import keyboard
@@ -99,10 +100,11 @@ class Graph():
         pass
 
 class GraphTraverser():
-    def __init__(self, graph: Graph, start_node=1, base_turn_angle=15):
+    def __init__(self, graph: Graph, start_node=1, base_turn_angle=15, plotImgs=False):
         self.graph = graph
         self.start_node = start_node
         self.base_turn_angle = base_turn_angle
+        self.plotImgs = plotImgs
         self.reset()
 
     def reset(self):
@@ -112,6 +114,7 @@ class GraphTraverser():
         self.actions = []
 
     def on_key_release(self, key):
+        #https://pynput.readthedocs.io/en/latest/keyboard.html#monitoring-the-keyboard
         if key == Key.right:
             print('turning right')
             self.turnRight()
@@ -128,25 +131,36 @@ class GraphTraverser():
             print("Exiting Graph Traversal")
             return False
 
-    def turnRight(self):
-        self.current_direction += self.base_turn_angle
+    def turnRight(self, angle=None):
+        if angle is None:
+            turn_angle = self.base_turn_angle
+        else:
+            turn_angle = angle
+        self.current_direction += turn_angle
         self.current_direction = self.current_direction % 360
         # update rule is start node, end node, amount moved forward, angle turned
-        self.actions.append([self.current_node, self.current_node, 'r', 0, self.base_turn_angle])
-        self.render()
+        self.actions.append([self.current_node, self.current_node, 'r', 0, turn_angle])
+        if self.plotImgs:
+            self.render()
 
-    def turnLeft(self):
-        self.current_direction -= self.base_turn_angle
+    def turnLeft(self, angle=None):
+        if angle is None:
+            turn_angle = self.base_turn_angle
+        else:
+            turn_angle = angle
+        self.current_direction -= turn_angle
         self.current_direction = (self.current_direction + 360) % 360
         # update rule is start node, end node, action, amount moved forward, angle turned
-        self.actions.append([self.current_node, self.current_node, 'l', 0, -self.base_turn_angle])
-        self.render()
+        self.actions.append([self.current_node, self.current_node, 'l', 0, -turn_angle])
+        if self.plotImgs:
+            self.render()
 
     def moveForward(self):
         nodeOptions = graph.getReachableVertices(self.current_node, self.current_direction)
         if len(nodeOptions)==0:
             # update rule is start node, end node, amount moved forward, angle turned
             self.actions.append([self.current_node, self.current_node, 'f', 0, 0])
+            print('Cant move forward!')
         else:
             if len(nodeOptions)==1:
                 newNode = nodeOptions[0]
@@ -159,6 +173,8 @@ class GraphTraverser():
             self.actions.append([self.current_node, newNode[1], 'f', newNode[3], 0])
             self.path.append(newNode[1])
             self.current_node = newNode[1]
+        if self.plotImgs:
+            self.render()
 
     def moveBack(self):
         backwardsDirection = (self.current_direction+180) % 360
@@ -166,6 +182,7 @@ class GraphTraverser():
         if len(nodeOptions) == 0:
             # update rule is start node, end node, amount moved forward, angle turned
             self.actions.append([self.current_node, self.current_node, 'b', 0, 0])
+            print('Cant move backward!')
         else:
             if len(nodeOptions) == 1:
                 newNode = nodeOptions[0]
@@ -178,20 +195,33 @@ class GraphTraverser():
             self.actions.append([self.current_node, newNode[1], 'b', -newNode[3], 0])
             self.path.append(newNode[1])
             self.current_node = newNode[1]
+        if self.plotImgs:
+            self.render()
+
+    def getImg(self,node=None, direction=None):
+        if node is None:
+            node = self.current_node
+        if direction is None:
+            direction = self.current_direction
+
+        return self.graph.getVertexFeats(node, direction)
 
     def render(self):
-        image = self.graph.getVertexFeats(self.current_node,self.current_direction)
+        image = self.getImg()
         plt.imshow(image)
         plt.title('Node: '+str(self.current_node)+', Heading: '+str(self.current_direction))
-        plt.pause(0.1)
+        plt.pause(0.01)
 
     def traverse(self):
         prompt_text = 'Use the arrow keys to look/turn left/right and move up/down\n' \
                       'Enter the "q" key to quit\n'
         print(prompt_text)
-        self.render()
+        if self.plotImgs:
+            self.render()
         with keyboard.Listener(on_release=self.on_key_release) as listener:
             listener.join()
+        if self.plotImgs:
+            plt.close(1)
 
     def save(self):
         breakpoint()
@@ -211,7 +241,9 @@ class GraphTraverser():
 
 if __name__ == '__main__':
     graph = Graph(config_path='labGraphConfig.json')
-    traverser = GraphTraverser(graph)
+    traverser = GraphTraverser(graph, plotImgs=True)
+    traverser.traverse()
+    time.sleep(2)
     traverser.traverse()
     traverser.save()
     traverser.reset()
