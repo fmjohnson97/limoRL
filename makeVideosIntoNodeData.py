@@ -145,18 +145,18 @@ if __name__=='__main__':
     # code to go from videos to data usable for nodeDataset.py
 
     # put the video frames into their node folders
-    video_files = glob('nodeVideos/*')
-    for vfile in tqdm(video_files):
-        save_path = vfile.split('/')[-1].split('.')[0]
-        saveVideoFrames(vfile,'nodePhotos/'+save_path+'/')
+    # video_files = glob('nodeVideos/*')
+    # for vfile in tqdm(video_files):
+    #     save_path = vfile.split('/')[-1].split('.')[0]
+    #     saveVideoFrames(vfile,'nodePhotos/'+save_path+'/')
 
     # interpolate angle labels for images on the nodes
-    photo_folders = glob('nodePhotos/*')
-    for folder in photo_folders:
-        interpolateFrameAngleLabels(folder+'/labels.json')
-        createLabelSplits(folder+'/labels.json')
+    # photo_folders = glob('nodePhotos/*')
+    # for folder in photo_folders:
+    #     interpolateFrameAngleLabels(folder+'/labels.json')
+    #     createLabelSplits(folder+'/labels.json')
 
-    # interpolateFrameAngleLabels('nodePhotos/node1/labels.json')
-    # createLabelSplits('nodePhotos/node1/labels.json')
+    interpolateFrameAngleLabels('nodePhotos/node9/labels.json')
+    createLabelSplits('nodePhotos/node9/labels.json')
 
     #TODO: resize all images

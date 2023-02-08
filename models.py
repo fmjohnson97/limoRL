@@ -1,9 +1,12 @@
 import torch
 import random
+import itertools
 import torch.nn as nn
 import numpy as np
+import torch.optim as optim
 
 from PIL import Image
+from copy import deepcopy
 from torchvision.models import feature_extraction, resnet18, ResNet18_Weights
 from torch.nn import Linear, ReLU, Sigmoid
 from torch.distributions.categorical import Categorical
@@ -71,9 +74,9 @@ class ResnetBackbone():
         # breakpoint()
         return features[self.return_node].reshape(len(features[self.return_node]), -1)
 
-class SACBaseline(nn.Module):
+class SACDiscreteBaseline(nn.Module):
     def __init__(self, args, backbone, action_dim, device):
-        super(SACBaseline, self).__init__()
+        super(SACDiscreteBaseline, self).__init__()
         #TODO: try value based method instead?
         #TODO: learning schedule
         #TODO: alpha schedule
@@ -122,13 +125,11 @@ class SACBaseline(nn.Module):
         self.total_params = sum(p.numel() for p in self.q1network.parameters() if p.requires_grad)
         self.total_params += sum(p.numel() for p in self.q2network.parameters() if p.requires_grad)
         self.total_params += sum(p.numel() for p in self.policyNetwork.parameters() if p.requires_grad)
-        # self.total_params += sum(p.numel() for p in self.img_fc.parameters() if p.requires_grad)
         print('Initialized SAC Baseline with',self.total_params,'parameters!\n')
 
     @torch.no_grad()
-    def get_action(self, observation, deterministic=False):
-        # observation = torch.FloatTensor(observation).reshape(-1, 3, observation.shape[1],observation.shape[2]).to(self.device)#.reshape(len(observation), -1).to(self.device)
-        # observation = torch.FloatTensor(observation).to(self.device)
+    def get_action(self, observation):
+        # breakpoint()
         img_feats = self.backbone.extractFeatures(observation)
         # img_feats = self.prelu(self.img_fc(observation))
         action_dist, action, log_action = self.policyNetwork(img_feats)
@@ -138,13 +139,12 @@ class SACBaseline(nn.Module):
 
     @torch.no_grad()
     def computeQTargets(self, sample):
-        # (s, a, r, s', done)
-        observation, action, reward, observation_new, done = sample
-        # observation_new = torch.FloatTensor(observation_new).reshape(-1, 3, observation_new.shape[1],observation_new.shape[2]).to(self.device)#.reshape(len(observation_new),-1).to(self.device)
-        img_new_feats = self.backbone.extractFeatures(observation_new) #self.prelu(self.img_fc(observation_new)) #
         # breakpoint()
+        # (s, a, r, g, s', done)
+        observation, action, reward, goal_info, observation_new, done = sample
+        img_new_feats = self.backbone.extractFeatures(observation_new) #self.prelu(self.img_fc(observation_new)) #
+        # print('imgnew',img_new_feats.mean())
         #get the target action from the current policy
-        # observation_new = torch.FloatTensor(observation_new).to(self.device)
         action_dist_new, action_new, log_action_new = self.policyNetwork(img_new_feats)
 
         #get target q values
@@ -156,21 +156,14 @@ class SACBaseline(nn.Module):
         q_target = q_target.reshape(len(q_target),-1).to(self.device)
         return q_target
 
-    def computePolicyLoss(self, img_feats):
-        # breakpoint()
-        action_dist, action, log_action = self.policyNetwork(img_feats)
-        q1_policy = self.q1network(img_feats, action)
-        q2_policy = self.q2network(img_feats, action)
-        q_value = torch.min(q1_policy, q2_policy)
-        return torch.sum((self.alpha * log_action - q_value)*action , axis=-1).mean()
+        # this was for computing the policy loss
         #self.pi_loss_func(q_value, self.alpha * log_action)  #(q_value - self.alpha * log_pi_action).mean() # they use L1 loss for some reason???
 
-    def update(self, sample, iteration):
+    def update(self, sample):
         # breakpoint()
-        observation, action, reward, observation_new, done = sample
-        # observation = torch.FloatTensor(observation).reshape(-1, 3, observation.shape[1],observation.shape[2]).to(self.device)#.reshape(len(observation), -1).to(self.device)
+        observation, action, reward, goal_info, observation_new, done = sample
+        # print(goal_info)
         img_feats = self.backbone.extractFeatures(observation) #self.prelu(self.img_fc(observation)) #
-        # observation = torch.FloatTensor(observation).to(self.device)
         action = torch.FloatTensor(action)#.reshape(-1,1)
         action = action.to(self.device)
 
@@ -181,7 +174,7 @@ class SACBaseline(nn.Module):
         q2_out = self.q2network(img_feats, action)[torch.where(action==1)].reshape(-1,1) #
         q1_loss = self.q_loss_func(q1_out, q_target)
         q2_loss = self.q_loss_func(q2_out, q_target)
-        q_loss = q1_loss + q2_loss
+        q_loss = torch.clamp(q1_loss + q2_loss,10,-10)
         q_loss.backward()#retain_graph=True)
         self.q_opt.step()
 
@@ -194,19 +187,25 @@ class SACBaseline(nn.Module):
         # breakpoint()
         # compute policy network loss and backprop it
         self.policy_opt.zero_grad()
-        policy_loss = self.computePolicyLoss(img_feats)
+        action_dist, action, log_action = self.policyNetwork(img_feats)
+        q1_policy = q1_out.detach() #self.q1network(img_feats, action)
+        q2_policy = q2_out.detach() #self.q2network(img_feats, action)
+        q_value = torch.min(q1_policy, q2_policy)
+        policy_loss = torch.sum((self.alpha * log_action - q_value) * action, axis=-1).mean()
+        # print('losses',q1_loss, q2_loss, q_loss, policy_loss)
         policy_loss.backward()
         self.policy_opt.step()
 
-        if iteration % 1 == 0:
-            #update target q networks; done before grad turned back on so no loss props to the target networks
-            with torch.no_grad():
-                for param, targ_param in zip(self.q1network.parameters(), self.targetQ1.parameters()):
-                    targ_param.data.mul_(self.polyak)
-                    targ_param.data.add_((1 - self.polyak) * param.data)
-                for param, targ_param in zip(self.q2network.parameters(), self.targetQ2.parameters()):
-                    targ_param.data.mul_(self.polyak)
-                    targ_param.data.add_((1 - self.polyak) * param.data)
+        # print('feats+q',img_feats.mean(), q1_out.mean(),q2_out.mean())
+
+        #update target q networks; done before grad turned back on so no loss props to the target networks
+        with torch.no_grad():
+            for param, targ_param in zip(self.q1network.parameters(), self.targetQ1.parameters()):
+                targ_param.data.mul_(self.polyak)
+                targ_param.data.add_((1 - self.polyak) * param.data)
+            for param, targ_param in zip(self.q2network.parameters(), self.targetQ2.parameters()):
+                targ_param.data.mul_(self.polyak)
+                targ_param.data.add_((1 - self.polyak) * param.data)
 
         # turn grad back on for the q networks
         for param in self.q1network.parameters():
@@ -231,9 +230,13 @@ class QNetwork(nn.Module):
     def __init__(self, feat_dim, action_dim):
         super(QNetwork, self).__init__()
         #pretrained feature extractor
-        self.fc1=Linear(feat_dim + action_dim,feat_dim // 8)
-        self.fc2 = Linear(feat_dim // 8, feat_dim // 64)
-        self.fc3 = Linear(feat_dim // 64, action_dim)
+        # self.fc1=Linear(feat_dim + action_dim,feat_dim // 8)
+        # self.fc2 = Linear(feat_dim // 8, feat_dim // 64)
+        # self.fc3 = Linear(feat_dim // 64, action_dim)
+
+        self.fc1 = Linear(feat_dim + action_dim, feat_dim // 128)
+        self.fc2 = Linear(feat_dim // 128, feat_dim // 256)
+        self.fc3 = Linear(feat_dim // 256, action_dim)
 
         # self.fc1=Linear(feat_dim + action_dim,feat_dim)
         # self.fc2 = Linear(feat_dim, action_dim)
@@ -252,9 +255,13 @@ class QNetwork(nn.Module):
 class PolicyNetwork(nn.Module):
     def __init__(self, args, feat_dim, action_dim):
         super(PolicyNetwork, self).__init__()
-        self.fc1 = Linear(feat_dim, feat_dim // 8)
-        self.fc2 = Linear(feat_dim // 8, feat_dim // 64)
-        self.logits = Linear(feat_dim // 64,action_dim)
+        # self.fc1 = Linear(feat_dim, feat_dim // 8)
+        # self.fc2 = Linear(feat_dim // 8, feat_dim // 64)
+        # self.logits = Linear(feat_dim // 64,action_dim)
+
+        self.fc1 = Linear(feat_dim, feat_dim // 128)
+        self.fc2 = Linear(feat_dim // 128, feat_dim // 256)
+        self.logits = Linear(feat_dim // 256, action_dim)
 
         # self.fc1 = Linear(feat_dim , feat_dim )
         # self.fc2 = Linear(feat_dim , action_dim)
@@ -274,10 +281,14 @@ class PolicyNetwork(nn.Module):
         #Needs to output [0: do nothing, 1: steer left, 2: steer right, 3: gas, 4: brake]
         logits = self.sigmoid(self.logits(feats))
 
-        z = logits == 0.0
+        # z = logits == 0.0
+        z = logits < 1e-8
         z = z.float() * 1e-8
 
-        return Categorical(logits), logits + z, torch.log(logits + z)
+        # print('logits',logits.mean(), (logits+z).mean(), torch.log(logits+z).mean())
+        # breakpoint()
+
+        return Categorical(logits+z), logits + z, torch.log(logits + z)
 
 class ReplayBuffer():
     def __init__(self, args):
@@ -305,6 +316,42 @@ class ReplayBuffer():
 
     def addSample(self, sample):
         #sample of the shape (s, a, r, s', done)
+        self.buffer.append(sample)
+        while len(self.buffer)>self.limit:
+            self.buffer.pop(0)
+
+class GoalReplayBuffer():
+    def __init__(self, args):
+        self.buffer=[]
+        self.limit=args.buffer_limit
+        self.batch_size=args.batch_size
+
+    def sample(self, batch_size=None):
+        if batch_size is None:
+            batch_size=self.batch_size
+        s=[]
+        a=[]
+        r=[]
+        g=[]
+        sprime=[]
+        done=[]
+        for i in range(batch_size):
+            ind=random.randint(0,len(self.buffer)-1)
+            temp=self.buffer[ind]
+            s.append(temp[0])
+            a.append(temp[1])
+            r.append(temp[2])
+            g.append(temp[3])
+            sprime.append(temp[4])
+            done.append(temp[5])
+        try:
+            return [np.stack(s), np.stack(a), np.stack(r), np.stack(g), np.stack(sprime), np.stack(done)]
+        except Exception as e:
+            print(e)
+            breakpoint()
+
+    def addSample(self, sample):
+        #sample of the shape (s, a, r, g, s', done)
         self.buffer.append(sample)
         while len(self.buffer)>self.limit:
             self.buffer.pop(0)

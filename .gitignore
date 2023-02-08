@@ -129,6 +129,6 @@ dmypy.json
 # Pyre type checker
 .pyre/
 /nodeVideos/
-/nodePhotos/
+/nodePhotos/*/*.png
 *.pt
 .DS_Store

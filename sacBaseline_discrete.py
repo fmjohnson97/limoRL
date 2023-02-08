@@ -396,6 +396,7 @@ def train(args):
                 task_completed+=0
                 if task_completed>=5:
                     print("Learning Complete!!! Successfully solved the problem",task_completed,'times')
+                    break
             observation, info = env.reset()
             ep_count+=1
             print('Episode',ep_count,'completed in',ep_len,'steps with',ep_reward,'reward!')

@@ -1,3 +1,4 @@
+import random
 import time
 import json
 import numpy as np
@@ -53,6 +54,7 @@ class Graph():
 
     def getVertexFeats(self, vertex_num, heading=None, heading_threshold=1):
         if heading is None:
+            #TODO: lol this could fail so hard pls fix??? this function should return an image!?
             return self.vertices[vertex_num-1]
         else:
             #TODO: this is slow; maybe make a dictionary inside the json file with angle:image name
@@ -100,18 +102,76 @@ class Graph():
         pass
 
 class GraphTraverser():
-    def __init__(self, graph: Graph, start_node=1, base_turn_angle=15, plotImgs=False):
+    def __init__(self, graph: Graph, start_node=1, base_turn_angle=15, plotImgs=False, recordActions=False, human=False):
         self.graph = graph
         self.start_node = start_node
         self.base_turn_angle = base_turn_angle
         self.plotImgs = plotImgs
+        self.recordActions = recordActions
+        self.action_space = 4
+        self.human = human #whether the traversal is by a human (true) or an RL agent (false)
         self.reset()
 
     def reset(self):
         self.current_node = self.start_node
         self.current_direction = 180
-        self.path = [self.current_node]
-        self.actions = []
+        self.setGoalNode()
+        if self.recordActions:
+            self.path = [self.current_node]
+            self.actions = []
+
+    def randomInit(self):
+        self.current_node = random.choice(range(1,len(self.graph.vertices)+1))
+        self.current_direction = random.choice(range(360))
+        self.setGoalNode()
+        if self.recordActions:
+            self.path = [self.current_node]
+            self.actions = []
+
+    def setGoalNode(self, goal=None, direction=None):
+        if goal is None:
+            first_level_reachable = self.graph.getAllNeighbors(self.current_node)
+            second_level_reachable = []
+            for node_info in first_level_reachable:
+                second_level_reachable.extend(self.graph.getAllNeighbors(node_info[1]))
+            choice = random.choice(second_level_reachable)
+            self.goalNode = choice[1]
+            #TODO: broaden this range
+            self.goalDirection = choice[2] #random.choice(range(360))
+        else:
+            self.goalNode = goal
+            self.goalDirection=direction
+
+    def step(self, action):
+        # returns reward and observation
+        # action is [straight, backward, left, right]
+        goal = self.goalNode
+        goal_dir = self.goalDirection
+        start = self.current_node
+        start_dir = self.current_direction
+        if action == 0:
+            reward = self.moveForward()
+            reward = self.checkGoal(reward)
+        elif action == 1:
+            reward = self.moveBack()
+            reward = self.checkGoal(reward)
+        elif action == 2:
+            reward = self.turnLeft()
+            reward = self.checkGoal(reward)
+        elif action == 3:
+            reward = self.turnRight()
+            reward = self.checkGoal(reward)
+        else:
+            print(action,"is not a valid action!")
+            breakpoint()
+
+        image = self.getImg()
+        return image, reward, (start, start_dir, goal, goal_dir), reward==1
+
+    def checkGoal(self, reward):
+        if self.current_node == self.goalNode and abs(self.current_direction-self.goalDirection)<self.base_turn_angle:
+            return 1
+        return reward/10
 
     def on_key_release(self, key):
         #https://pynput.readthedocs.io/en/latest/keyboard.html#monitoring-the-keyboard
@@ -138,10 +198,12 @@ class GraphTraverser():
             turn_angle = angle
         self.current_direction += turn_angle
         self.current_direction = self.current_direction % 360
-        # update rule is start node, end node, amount moved forward, angle turned
-        self.actions.append([self.current_node, self.current_node, 'r', 0, turn_angle])
+        if self.recordActions:
+            # update rule is start node, end node, amount moved forward, angle turned
+            self.actions.append([self.current_node, self.current_node, 'r', 0, turn_angle])
         if self.plotImgs:
             self.render()
+        return -1
 
     def turnLeft(self, angle=None):
         if angle is None:
@@ -150,17 +212,22 @@ class GraphTraverser():
             turn_angle = angle
         self.current_direction -= turn_angle
         self.current_direction = (self.current_direction + 360) % 360
-        # update rule is start node, end node, action, amount moved forward, angle turned
-        self.actions.append([self.current_node, self.current_node, 'l', 0, -turn_angle])
+        if self.recordActions:
+            # update rule is start node, end node, action, amount moved forward, angle turned
+            self.actions.append([self.current_node, self.current_node, 'l', 0, -turn_angle])
         if self.plotImgs:
             self.render()
+        return -1
 
     def moveForward(self):
-        nodeOptions = graph.getReachableVertices(self.current_node, self.current_direction)
+        nodeOptions = self.graph.getReachableVertices(self.current_node, self.current_direction)
         if len(nodeOptions)==0:
-            # update rule is start node, end node, amount moved forward, angle turned
-            self.actions.append([self.current_node, self.current_node, 'f', 0, 0])
-            print('Cant move forward!')
+            if self.recordActions:
+                # update rule is start node, end node, amount moved forward, angle turned
+                self.actions.append([self.current_node, self.current_node, 'f', 0, 0])
+            if self.human:
+                print('Cant move forward!')
+            # return -10
         else:
             if len(nodeOptions)==1:
                 newNode = nodeOptions[0]
@@ -169,20 +236,25 @@ class GraphTraverser():
                 ang_ind = np.argmin(angles)
                 newNode = nodeOptions[ang_ind]
 
-            # update rule is start node, end node, amount moved forward, angle turned
-            self.actions.append([self.current_node, newNode[1], 'f', newNode[3], 0])
-            self.path.append(newNode[1])
+            if self.recordActions:
+                # update rule is start node, end node, amount moved forward, angle turned
+                self.actions.append([self.current_node, newNode[1], 'f', newNode[3], 0])
+                self.path.append(newNode[1])
             self.current_node = newNode[1]
         if self.plotImgs:
             self.render()
+        return -1
 
     def moveBack(self):
         backwardsDirection = (self.current_direction+180) % 360
-        nodeOptions = graph.getReachableVertices(self.current_node, backwardsDirection)
+        nodeOptions = self.graph.getReachableVertices(self.current_node, backwardsDirection)
         if len(nodeOptions) == 0:
-            # update rule is start node, end node, amount moved forward, angle turned
-            self.actions.append([self.current_node, self.current_node, 'b', 0, 0])
-            print('Cant move backward!')
+            if self.recordActions:
+                # update rule is start node, end node, amount moved forward, angle turned
+                self.actions.append([self.current_node, self.current_node, 'b', 0, 0])
+            if self.human:
+                print('Cant move backward!')
+            # return -10
         else:
             if len(nodeOptions) == 1:
                 newNode = nodeOptions[0]
@@ -191,14 +263,16 @@ class GraphTraverser():
                 ang_ind = np.argmin(angles)
                 newNode = nodeOptions[ang_ind]
 
-            # update rule is start node, end node, amount moved forward, angle turned
-            self.actions.append([self.current_node, newNode[1], 'b', -newNode[3], 0])
-            self.path.append(newNode[1])
+            if self.recordActions:
+                # update rule is start node, end node, amount moved forward, angle turned
+                self.actions.append([self.current_node, newNode[1], 'b', -newNode[3], 0])
+                self.path.append(newNode[1])
             self.current_node = newNode[1]
         if self.plotImgs:
             self.render()
+        return -1
 
-    def getImg(self,node=None, direction=None):
+    def getImg(self, node=None, direction=None):
         if node is None:
             node = self.current_node
         if direction is None:
@@ -207,6 +281,7 @@ class GraphTraverser():
         return self.graph.getVertexFeats(node, direction)
 
     def render(self):
+        #TODO: keep track of the figure so the slowdown stops happening
         image = self.getImg()
         plt.imshow(image)
         plt.title('Node: '+str(self.current_node)+', Heading: '+str(self.current_direction))
@@ -224,7 +299,6 @@ class GraphTraverser():
             plt.close(1)
 
     def save(self):
-        breakpoint()
         with open(self.graph.config['envName']+'Trials.json','a') as f:
             try:
                 trials = json.load(f)
@@ -241,7 +315,9 @@ class GraphTraverser():
 
 if __name__ == '__main__':
     graph = Graph(config_path='labGraphConfig.json')
-    traverser = GraphTraverser(graph, plotImgs=True)
+    # breakpoint()
+    traverser = GraphTraverser(graph, plotImgs=True, recordActions=True)
+    traverser.setGoalNode()
     traverser.traverse()
     time.sleep(2)
     traverser.traverse()
