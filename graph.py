@@ -281,7 +281,7 @@ class GraphTraverser():
         image = self.graph.getVertexFeats(node, direction)
         while image is None:
             print("Warning! no image for node",node,"in direction",direction)
-            direction+=1
+            direction = (direction + 1) % 360
             print("Using direction", direction, "instead!")
             image = self.graph.getVertexFeats(node, direction)
             # breakpoint()
