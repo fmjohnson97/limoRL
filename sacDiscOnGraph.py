@@ -9,6 +9,9 @@ from graph import GraphTraverser, Graph
 def getArgs():
     parser=argparse.ArgumentParser()
 
+    #file parameters
+    parser.add_argument('--config_file', type=str, default='labGraphConfig.json', help='path to the graph config file')
+
     # training hyperparameters
     parser.add_argument('--batch_size', type=int, default=32, help='number of samples used to update the networks at once')
     parser.add_argument('--epochs', type=int, default=200000, help='number of epochs for training')
@@ -16,15 +19,16 @@ def getArgs():
     parser.add_argument('--use_policy_step', type=int, default=100, help='number of steps before using the learned policy')
     parser.add_argument('--lr', type=float, default=5e-4, help='learning rate for training')
     parser.add_argument('--save_name', default='sacDiscOnGraph', help='prefix name for saving the SAC networks')
+    parser.add_argument('--target_update_freq', type=int, default=8000, help='max number of samples in the replay buffer')
 
     # buffer hyperparameters
     parser.add_argument('--buffer_limit', type=int, default=40000, help='max number of samples in the replay buffer')
-    parser.add_argument('--buffer_init_steps', type=int, default=1000, help='number of random actions to take before train loop')
+    parser.add_argument('--buffer_init_steps', type=int, default=5000, help='number of random actions to take before train loop')
 
     # sac hyperparameters
     parser.add_argument('--gamma', type=float, default=0.99, help='discount factor for SAC RL')
     parser.add_argument('--alpha', type=float, default=0.2, help='discount factor for entropy for sac')
-    parser.add_argument('--polyak', type=float, default=0.95, help='polyak averaging parameter')#.995???
+    parser.add_argument('--polyak', type=float, default=0.98, help='polyak averaging parameter')#.995???
 
     # resnet backbone args
     parser.add_argument('--return_node', type=str, default='layer4', choices=['layer1','layer2','layer3','layer4'], help='resnet layer to return features from')
@@ -34,7 +38,7 @@ def getArgs():
 
 def train(args, device):
     # initialize the environment and get the first observation
-    env = GraphTraverser(Graph(config_path='labGraphConfig.json'))
+    env = GraphTraverser(Graph(config_path=args.config_file))
     obs = env.getImg()
 
     #TODO: need to make SAC goal conditioned when getting actions!
@@ -125,6 +129,9 @@ def train(args, device):
     return model
 
 if __name__ == '__main__':
+    torch.manual_seed(525)
+    np.random.seed(525)
+
     args = getArgs()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 

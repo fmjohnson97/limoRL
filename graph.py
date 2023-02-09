@@ -32,6 +32,9 @@ class Graph():
         # and the distance d (*approximate* but close enough) between the vertices in feet
         self.weights = [None]*int(self.config['num_vertices']) #TODO: is this just going to be the thing in the vertices list? or will this help with navigation/path planning?
 
+        with open(self.config['envName']+'AngleKey.json') as f:
+            self.angleKey = json.load(f)
+
     def populateVertices(self, num_vertices, assetPath):
         assets = glob(assetPath+'*')
         for i in range(num_vertices):
@@ -54,18 +57,13 @@ class Graph():
 
     def getVertexFeats(self, vertex_num, heading=None, heading_threshold=1):
         if heading is None:
-            #TODO: lol this could fail so hard pls fix??? this function should return an image!?
-            return self.vertices[vertex_num-1]
-        else:
-            #TODO: this is slow; maybe make a dictionary inside the json file with angle:image name
-            with open(self.vertices[vertex_num-1]+'labels.json') as f:
-                labels = json.load(f)
-            labels.pop('train')
-            labels.pop('val')
-            labels.pop('test')
-            for k,v in labels.items():
-                if abs(v[-1]-heading)<heading_threshold:
-                    return Image.open(self.vertices[vertex_num-1]+'node'+str(vertex_num)+'_'+str(k)+self.config['photoExtension'])
+            heading = random.choice(range(0,360,5)) #TODO: expand to all angles maybe?
+
+        while str(heading) not in self.angleKey[str(vertex_num)].keys():
+            heading = (heading + 1) % 360
+
+        choice = random.choice(self.angleKey[str(vertex_num)][str(heading)])
+        return Image.open(self.vertices[vertex_num - 1] + 'node' + str(vertex_num) + '_' + choice + self.config['photoExtension'])
 
     def addNode(self, nodeFeatures=None, nodeFeatPath=None):
         if nodeFeatures is None:
@@ -121,8 +119,8 @@ class GraphTraverser():
             self.actions = []
 
     def randomInit(self):
-        self.current_node = random.choice(range(1,len(self.graph.vertices)+1))
-        self.current_direction = random.choice(range(0,360,5))
+        self.current_node = random.choice(range(1,self.graph.config['num_vertices']+1))
+        self.current_direction = random.choice(range(0,360,5)) #TODO: expand to all angles maybe?
         self.setGoalNode()
         if self.recordActions:
             self.path = [self.current_node]
@@ -136,8 +134,7 @@ class GraphTraverser():
                 second_level_reachable.extend(self.graph.getAllNeighbors(node_info[1]))
             choice = random.choice(second_level_reachable)
             self.goalNode = choice[1]
-            #TODO: broaden this range
-            self.goalDirection = choice[2] #random.choice(range(360))
+            self.goalDirection = choice[2]
         else:
             self.goalNode = goal
             self.goalDirection=direction
@@ -171,7 +168,7 @@ class GraphTraverser():
     def checkGoal(self, reward):
         if self.current_node == self.goalNode and abs(self.current_direction-self.goalDirection)<self.base_turn_angle:
             return 1
-        return reward/10
+        return reward
 
     def on_key_release(self, key):
         #https://pynput.readthedocs.io/en/latest/keyboard.html#monitoring-the-keyboard

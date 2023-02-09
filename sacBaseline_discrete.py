@@ -1,4 +1,4 @@
-''' Implementation of a SAC baseline for the car racing openai gym environment with a resnet50 image processing backbone.
+''' Implementation of a SAC baseline for the car racing openai gym environment with a resnet18 image processing backbone.
  Based HEAVILY on this:https://github.com/openai/spinningup/tree/038665d62d569055401d91856abb287263096178/spinup/algos/pytorch/sac '''
 
 import torch

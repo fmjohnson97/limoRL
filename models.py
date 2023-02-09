@@ -119,9 +119,9 @@ class SACDiscreteBaseline(nn.Module):
 
         #initialized optimizers
         self.policy_opt = optim.Adam(self.policyNetwork.parameters(), lr=args.lr)
-        self.q1_opt = optim.Adam(self.q1network.parameters(), lr=args.lr)
-        self.q2_opt = optim.Adam(self.q2network.parameters(), lr=args.lr)
-        # self.q1_opt = optim.Adam(itertools.chain(self.q1network.parameters(), self.q2network.parameters()), lr=args.lr)
+        # self.q1_opt = optim.Adam(self.q1network.parameters(), lr=args.lr)
+        # self.q2_opt = optim.Adam(self.q2network.parameters(), lr=args.lr)
+        self.q_opt = optim.Adam(itertools.chain(self.q1network.parameters(), self.q2network.parameters()), lr=args.lr)
 
         #init loss function
         self.q_loss_func=nn.MSELoss()
@@ -179,20 +179,20 @@ class SACDiscreteBaseline(nn.Module):
         action = action.to(self.device)
 
         # compute q networks loss and backprop it
-        self.q1_opt.zero_grad()
-        self.q2_opt.zero_grad()
+        self.q_opt.zero_grad()
+        # self.q2_opt.zero_grad()
         q_target = self.computeQTargets(sample)
         q1_out = self.q1network(img_feats, action)[torch.where(action==1)].reshape(-1,1) #
         q2_out = self.q2network(img_feats, action)[torch.where(action==1)].reshape(-1,1) #
         q1_loss = self.q_loss_func(q1_out, q_target)
         q2_loss = self.q_loss_func(q2_out, q_target)
-        # q_loss = torch.clamp(q1_loss + q2_loss,-10,10) #TODO: determine how to fix besides reward clipping?
+        q_loss = q1_loss + q2_loss #torch.clamp(q1_loss + q2_loss,-10,10) #TODO: determine how to fix besides reward clipping?
         # q_loss = torch.min(q1_loss, q2_loss)
-        # q_loss.backward()#retain_graph=True)
-        q1_loss.backward()
-        q2_loss.backward()
-        self.q1_opt.step()
-        self.q2_opt.step()
+        q_loss.backward()#retain_graph=True)
+        # q1_loss.backward()
+        # q2_loss.backward()
+        self.q_opt.step()
+        # self.q2_opt.step()
 
         # freeze q weights to ease policy network backprop computation
         for param in self.q1network.parameters():

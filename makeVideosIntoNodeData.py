@@ -139,7 +139,23 @@ def createLabelSplits(label_path):
     with open(label_path, 'w') as f:
         json.dump(labels,f)
 
+def makeNodeAngleListFile(node_photo_folder):
+    node_angle_key={}
+    for node_folder in node_photo_folder:
+        with open(node_folder+'/labels.json', 'r') as f:
+            labels = json.load(f)
+        labels.pop('train')
+        labels.pop('val')
+        labels.pop('test')
 
+        angle_list = defaultdict(list)
+        for k,v in labels.items():
+            angle_list[v[-1]].append(k)
+
+        node_angle_key[node_folder.split('node')[-1]]=angle_list
+
+    with open('nodeAngleKey.json', 'a') as f:
+        json.dump(node_angle_key,f)
 
 if __name__=='__main__':
     # code to go from videos to data usable for nodeDataset.py
@@ -151,12 +167,11 @@ if __name__=='__main__':
     #     saveVideoFrames(vfile,'nodePhotos/'+save_path+'/')
 
     # interpolate angle labels for images on the nodes
-    # photo_folders = glob('nodePhotos/*')
+    photo_folders = glob('nodePhotos/*')
     # for folder in photo_folders:
     #     interpolateFrameAngleLabels(folder+'/labels.json')
     #     createLabelSplits(folder+'/labels.json')
 
-    interpolateFrameAngleLabels('nodePhotos/node9/labels.json')
-    createLabelSplits('nodePhotos/node9/labels.json')
+    makeNodeAngleListFile(photo_folders)
 
     #TODO: resize all images
