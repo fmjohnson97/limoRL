@@ -68,7 +68,11 @@ class ResnetBackbone():
             img_ext=torch.stack(img_ext).to(self.device)
         else:
             # breakpoint()
-            img_ext=torch.FloatTensor(img).unsqueeze(0).to(self.device)
+            try:
+                img_ext=torch.FloatTensor(img).unsqueeze(0).to(self.device)
+            except Exception as e:
+                print(e)
+                breakpoint()
 
         features = self.feat_ext(img_ext)
         # breakpoint()

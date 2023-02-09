@@ -122,7 +122,7 @@ class GraphTraverser():
 
     def randomInit(self):
         self.current_node = random.choice(range(1,len(self.graph.vertices)+1))
-        self.current_direction = random.choice(range(360))
+        self.current_direction = random.choice(range(0,360,5))
         self.setGoalNode()
         if self.recordActions:
             self.path = [self.current_node]
@@ -278,7 +278,14 @@ class GraphTraverser():
         if direction is None:
             direction = self.current_direction
 
-        return self.graph.getVertexFeats(node, direction)
+        image = self.graph.getVertexFeats(node, direction)
+        while image is None:
+            print("Warning! no image for node",node,"in direction",direction)
+            direction+=1
+            print("Using direction", direction, "instead!")
+            image = self.graph.getVertexFeats(node, direction)
+            # breakpoint()
+        return image
 
     def render(self):
         #TODO: keep track of the figure so the slowdown stops happening
