@@ -119,7 +119,9 @@ class SACDiscreteBaseline(nn.Module):
 
         #initialized optimizers
         self.policy_opt = optim.Adam(self.policyNetwork.parameters(), lr=args.lr)
-        self.q_opt = optim.Adam(itertools.chain(self.q1network.parameters(), self.q2network.parameters()), lr=args.lr)
+        self.q1_opt = optim.Adam(self.q1network.parameters(), lr=args.lr)
+        self.q2_opt = optim.Adam(self.q2network.parameters(), lr=args.lr)
+        # self.q1_opt = optim.Adam(itertools.chain(self.q1network.parameters(), self.q2network.parameters()), lr=args.lr)
 
         #init loss function
         self.q_loss_func=nn.MSELoss()
@@ -177,15 +179,20 @@ class SACDiscreteBaseline(nn.Module):
         action = action.to(self.device)
 
         # compute q networks loss and backprop it
-        self.q_opt.zero_grad()
+        self.q1_opt.zero_grad()
+        self.q2_opt.zero_grad()
         q_target = self.computeQTargets(sample)
         q1_out = self.q1network(img_feats, action)[torch.where(action==1)].reshape(-1,1) #
         q2_out = self.q2network(img_feats, action)[torch.where(action==1)].reshape(-1,1) #
         q1_loss = self.q_loss_func(q1_out, q_target)
         q2_loss = self.q_loss_func(q2_out, q_target)
-        q_loss = torch.clamp(q1_loss + q2_loss,1,-1) #TODO: determine how to fix besides reward clipping?
-        q_loss.backward()#retain_graph=True)
-        self.q_opt.step()
+        # q_loss = torch.clamp(q1_loss + q2_loss,-10,10) #TODO: determine how to fix besides reward clipping?
+        # q_loss = torch.min(q1_loss, q2_loss)
+        # q_loss.backward()#retain_graph=True)
+        q1_loss.backward()
+        q2_loss.backward()
+        self.q1_opt.step()
+        self.q2_opt.step()
 
         # freeze q weights to ease policy network backprop computation
         for param in self.q1network.parameters():
@@ -201,7 +208,7 @@ class SACDiscreteBaseline(nn.Module):
         q2_policy = q2_out.detach() #self.q2network(img_feats, action)
         q_value = torch.min(q1_policy, q2_policy)
         policy_loss = torch.sum((self.alpha * log_action - q_value) * action, axis=-1).mean()
-        # print('losses',q1_loss, q2_loss, q_loss, policy_loss)
+        # print('losses',q1_loss, q2_loss, q1_loss+q2_loss, policy_loss)
         policy_loss.backward()
         self.policy_opt.step()
 
@@ -222,7 +229,8 @@ class SACDiscreteBaseline(nn.Module):
         for param in self.q2network.parameters():
             param.requires_grad = True
 
-        return q_loss.item(), policy_loss.item()
+        # return q_loss.item(), policy_loss.item()
+        return (q1_loss+q2_loss).item(), policy_loss.item()
 
     def save_models(self,name):
         if name is None:
@@ -243,8 +251,8 @@ class QNetwork(nn.Module):
         # self.fc2 = Linear(feat_dim // 8, feat_dim // 64)
         # self.fc3 = Linear(feat_dim // 64, action_dim)
 
-        self.fc1 = Linear(feat_dim + action_dim, feat_dim // 128)
-        self.fc2 = Linear(feat_dim // 128, feat_dim // 256)
+        self.fc1 = Linear(feat_dim + action_dim, feat_dim // 256)
+        self.fc2 = Linear(feat_dim // 256, feat_dim // 256)
         self.fc3 = Linear(feat_dim // 256, action_dim)
 
         # self.fc1=Linear(feat_dim + action_dim,feat_dim)
@@ -268,8 +276,8 @@ class PolicyNetwork(nn.Module):
         # self.fc2 = Linear(feat_dim // 8, feat_dim // 64)
         # self.logits = Linear(feat_dim // 64,action_dim)
 
-        self.fc1 = Linear(feat_dim, feat_dim // 128)
-        self.fc2 = Linear(feat_dim // 128, feat_dim // 256)
+        self.fc1 = Linear(feat_dim, feat_dim // 256)
+        self.fc2 = Linear(feat_dim // 256, feat_dim // 256)
         self.logits = Linear(feat_dim // 256, action_dim)
 
         # self.fc1 = Linear(feat_dim , feat_dim )
