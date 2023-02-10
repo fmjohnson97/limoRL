@@ -178,7 +178,7 @@ class GraphTraverser():
     def checkGoal(self, reward):
         if self.current_node == self.goalNode and abs(self.current_direction-self.goalDirection)<self.base_turn_angle:
             return 1
-        return reward/10
+        return reward#/10
 
     def on_key_release(self, key):
         #https://pynput.readthedocs.io/en/latest/keyboard.html#monitoring-the-keyboard

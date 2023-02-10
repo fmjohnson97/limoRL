@@ -191,8 +191,8 @@ class SACDiscreteBaseline(nn.Module):
         q2_out = self.q2network(img_feats, action)[torch.where(action==1)].reshape(-1,1) #
         q1_loss = self.q_loss_func(q1_out, q_target)
         q2_loss = self.q_loss_func(q2_out, q_target)
-        q1_loss = torch.clamp(q1_loss, -1, 1)
-        q2_loss = torch.clamp(q2_loss, -1, 1)
+        # q1_loss = torch.clamp(q1_loss, -1, 1)
+        # q2_loss = torch.clamp(q2_loss, -1, 1)
         # q_loss = q1_loss + q2_loss #torch.clamp(q1_loss + q2_loss,-10,10) #TODO: determine how to fix besides reward clipping?
         # q_loss = torch.min(q1_loss, q2_loss)
         # q_loss.backward()#retain_graph=True)
@@ -202,20 +202,21 @@ class SACDiscreteBaseline(nn.Module):
         self.q2_opt.step()
 
         # freeze q weights to ease policy network backprop computation
-        for param in self.q1network.parameters():
-            param.requires_grad = False
-        for param in self.q2network.parameters():
-            param.requires_grad = False
+        # for param in self.q1network.parameters():
+        #     param.requires_grad = False
+        # for param in self.q2network.parameters():
+        #     param.requires_grad = False
 
         # breakpoint()
         # compute policy network loss and backprop it
         self.policy_opt.zero_grad()
         action_dist, action, log_action = self.policyNetwork(img_feats)
-        q1_policy = q1_out.detach() #self.q1network(img_feats, action)
-        q2_policy = q2_out.detach() #self.q2network(img_feats, action)
-        q_value = torch.min(q1_policy, q2_policy)
+        with torch.no_grad():
+            q1_policy = self.q1network(img_feats, action)
+            q2_policy = self.q2network(img_feats, action)
+            q_value = torch.min(q1_policy, q2_policy)
         policy_loss = torch.sum((self.alpha * log_action - q_value) * action, axis=-1).mean()
-        policy_loss = torch.clamp(policy_loss, -1, 1)
+        # policy_loss = torch.clamp(policy_loss, -1, 1)
         # print('losses',q1_loss, q2_loss, q1_loss+q2_loss, policy_loss)
         policy_loss.backward()
         self.policy_opt.step()
@@ -232,10 +233,10 @@ class SACDiscreteBaseline(nn.Module):
                 targ_param.data.add_((1 - self.polyak) * param.data)
 
         # turn grad back on for the q networks
-        for param in self.q1network.parameters():
-            param.requires_grad = True
-        for param in self.q2network.parameters():
-            param.requires_grad = True
+        # for param in self.q1network.parameters():
+        #     param.requires_grad = True
+        # for param in self.q2network.parameters():
+        #     param.requires_grad = True
 
         # return q_loss.item(), policy_loss.item()
         return (q1_loss+q2_loss).item(), policy_loss.item()
