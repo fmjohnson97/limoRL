@@ -16,7 +16,7 @@ def getArgs():
     parser.add_argument('--batch_size', type=int, default=32, help='number of samples used to update the networks at once')
     parser.add_argument('--epochs', type=int, default=500000, help='number of epochs for training')
     parser.add_argument('--steps_per_epoch', type=int, default = 30, help='max number of steps for each epoch')
-    parser.add_argument('--use_policy_step', type=int, default=100, help='number of steps before using the learned policy')
+    parser.add_argument('--use_policy_step', type=int, default=300, help='number of steps before using the learned policy')
     parser.add_argument('--lr', type=float, default=1e-5, help='learning rate for training')
     parser.add_argument('--save_name', default='sacDiscOnGraph', help='prefix name for saving the SAC networks')
     parser.add_argument('--target_update_freq', type=int, default=10, help='max number of samples in the replay buffer')
