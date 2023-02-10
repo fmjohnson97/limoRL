@@ -59,7 +59,7 @@ def train(args, device):
         # sample of the shape (s, a, r, g, s', done)
         replay_buffer.addSample([obs, action, reward, goal_img, obs_new, done])
         # implementing hindsight experience replay
-        replay_buffer.addHERSample([obs, action, reward, goal_img, obs_new, done], args.max_reward)
+        # replay_buffer.addHERSample([obs, action, reward, goal_img, obs_new, done], args.max_reward)
         if reward == 1 or step % args.steps_per_epoch==0:
             env.randomInit()
             obs = env.getImg()
@@ -101,7 +101,7 @@ def train(args, device):
         # sample of the shape (s, a, r, g, s', done)
         replay_buffer.addSample([obs, action, reward, goal_img, obs_new, done])
         # implementing hindsight experience replay
-        replay_buffer.addHERSample([obs, action, reward, goal_img, obs_new, done], args.max_reward)
+        # replay_buffer.addHERSample([obs, action, reward, goal_img, obs_new, done], args.max_reward)
         # if step>args.use_policy_step:
         #     print('action+reward+state+goal', action, reward, (env.current_node, env.current_direction), (env.goalNode, env.goalDirection))
         ep_reward+=reward
