@@ -88,8 +88,8 @@ def train(args, device):
             action = model.get_action(np.stack([obs]), np.stack([goal_img]))
 
         # take action in the environment and save to replay/update trackers
-        if step > args.use_policy_step:
-            print('pre state+goal', (env.current_node, env.current_direction), (env.goalNode, env.goalDirection))
+        # if step > args.use_policy_step:
+        #     print('pre state+goal', (env.current_node, env.current_direction), (env.goalNode, env.goalDirection))
         obs_new, reward, goal_info, done = env.step(action)
         # storing the action as a vector
         action_ind = action
@@ -102,8 +102,8 @@ def train(args, device):
         replay_buffer.addSample([obs, action, reward, goal_img, obs_new, done])
         # implementing hindsight experience replay
         replay_buffer.addHERSample([obs, action, reward, goal_img, obs_new, done], args.max_reward)
-        if step>args.use_policy_step:
-            print('action+reward+state+goal', action, reward, (env.current_node, env.current_direction), (env.goalNode, env.goalDirection))
+        # if step>args.use_policy_step:
+        #     print('action+reward+state+goal', action, reward, (env.current_node, env.current_direction), (env.goalNode, env.goalDirection))
         ep_reward+=reward
         ep_len+=1
 
