@@ -19,7 +19,7 @@ def getArgs():
     parser.add_argument('--use_policy_step', type=int, default=100, help='number of steps before using the learned policy')
     parser.add_argument('--lr', type=float, default=1e-5, help='learning rate for training')
     parser.add_argument('--save_name', default='sacDiscOnGraph', help='prefix name for saving the SAC networks')
-    parser.add_argument('--target_update_freq', type=int, default=8000, help='max number of samples in the replay buffer')
+    parser.add_argument('--target_update_freq', type=int, default=10, help='max number of samples in the replay buffer')
 
     # buffer hyperparameters
     parser.add_argument('--buffer_limit', type=int, default=400000, help='max number of samples in the replay buffer')
@@ -131,7 +131,7 @@ def train(args, device):
 
         # sample the buffer, do the q and policy updates, update trackers
         sample = replay_buffer.sample()  # (s, a, r, s', done)
-        qloss, policyloss = model.update(sample)
+        qloss, policyloss = model.update(sample, step % args.target_update_freq == 0)
         total_qloss += qloss
         total_policyloss += policyloss
 

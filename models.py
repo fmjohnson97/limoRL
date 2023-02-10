@@ -173,7 +173,7 @@ class SACDiscreteBaseline(nn.Module):
         # this was for computing the policy loss
         #self.pi_loss_func(q_value, self.alpha * log_action)  #(q_value - self.alpha * log_pi_action).mean() # they use L1 loss for some reason???
 
-    def update(self, sample):
+    def update(self, sample, updateTargets=True):
         # breakpoint()
         observation, action, reward, goal_imgs, observation_new, done = sample
         # print(goal_info)
@@ -224,13 +224,14 @@ class SACDiscreteBaseline(nn.Module):
         # print('q vals + targ', q1_out.mean(),q2_out.mean(), q_target.mean())
 
         #update target q networks; done before grad turned back on so no loss props to the target networks
-        with torch.no_grad():
-            for param, targ_param in zip(self.q1network.parameters(), self.targetQ1.parameters()):
-                targ_param.data.mul_(self.polyak)
-                targ_param.data.add_((1 - self.polyak) * param.data)
-            for param, targ_param in zip(self.q2network.parameters(), self.targetQ2.parameters()):
-                targ_param.data.mul_(self.polyak)
-                targ_param.data.add_((1 - self.polyak) * param.data)
+        if updateTargets:
+            with torch.no_grad():
+                for param, targ_param in zip(self.q1network.parameters(), self.targetQ1.parameters()):
+                    targ_param.data.mul_(self.polyak)
+                    targ_param.data.add_((1 - self.polyak) * param.data)
+                for param, targ_param in zip(self.q2network.parameters(), self.targetQ2.parameters()):
+                    targ_param.data.mul_(self.polyak)
+                    targ_param.data.add_((1 - self.polyak) * param.data)
 
         # turn grad back on for the q networks
         # for param in self.q1network.parameters():
