@@ -14,16 +14,17 @@ def getArgs():
 
     # training hyperparameters
     parser.add_argument('--batch_size', type=int, default=32, help='number of samples used to update the networks at once')
-    parser.add_argument('--epochs', type=int, default=200000, help='number of epochs for training')
-    parser.add_argument('--steps_per_epoch', type=int, default = 50, help='max number of steps for each epoch')
+    parser.add_argument('--epochs', type=int, default=500000, help='number of epochs for training')
+    parser.add_argument('--steps_per_epoch', type=int, default = 30, help='max number of steps for each epoch')
     parser.add_argument('--use_policy_step', type=int, default=100, help='number of steps before using the learned policy')
-    parser.add_argument('--lr', type=float, default=5e-4, help='learning rate for training')
+    parser.add_argument('--lr', type=float, default=5e-5, help='learning rate for training')
     parser.add_argument('--save_name', default='sacDiscOnGraph', help='prefix name for saving the SAC networks')
     parser.add_argument('--target_update_freq', type=int, default=8000, help='max number of samples in the replay buffer')
 
     # buffer hyperparameters
     parser.add_argument('--buffer_limit', type=int, default=40000, help='max number of samples in the replay buffer')
     parser.add_argument('--buffer_init_steps', type=int, default=5000, help='number of random actions to take before train loop')
+    parser.add_argument('--max_reward', type=float, default=1, help='max reward achievable by agent when reaches goal')
 
     # sac hyperparameters
     parser.add_argument('--gamma', type=float, default=0.99, help='discount factor for SAC RL')
@@ -57,6 +58,8 @@ def train(args, device):
         goal_img = env.getImg(goal_info[-2], goal_info[-1])
         # sample of the shape (s, a, r, g, s', done)
         replay_buffer.addSample([obs, action, reward, goal_img, obs_new, done])
+        # implementing hindsight experience replay
+        replay_buffer.addHERSample([obs, action, reward, goal_img, obs_new, done], args.max_reward)
         if reward == 1 or step % args.steps_per_epoch==0:
             env.randomInit()
             obs = env.getImg()
@@ -85,6 +88,8 @@ def train(args, device):
             action = model.get_action(np.stack([obs]), np.stack([goal_img]))
 
         # take action in the environment and save to replay/update trackers
+        if step > args.use_policy_step:
+            print('pre state+goal', (env.current_node, env.current_direction), (env.goalNode, env.goalDirection))
         obs_new, reward, goal_info, done = env.step(action)
         # storing the action as a vector
         action_ind = action
@@ -95,6 +100,10 @@ def train(args, device):
         goal_img = env.getImg(goal_info[-2], goal_info[-1])
         # sample of the shape (s, a, r, g, s', done)
         replay_buffer.addSample([obs, action, reward, goal_img, obs_new, done])
+        # implementing hindsight experience replay
+        replay_buffer.addHERSample([obs, action, reward, goal_img, obs_new, done], args.max_reward)
+        if step>args.use_policy_step:
+            print('action+reward+state+goal', action, reward, (env.current_node, env.current_direction), (env.goalNode, env.goalDirection))
         ep_reward+=reward
         ep_len+=1
 

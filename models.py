@@ -11,6 +11,11 @@ from torchvision.models import feature_extraction, resnet18, ResNet18_Weights
 from torch.nn import Linear, ReLU, Sigmoid
 from torch.distributions.categorical import Categorical
 
+def weights_init_(m):
+    if isinstance(m, nn.Linear):
+        torch.nn.init.xavier_uniform_(m.weight, gain=1)
+        torch.nn.init.constant_(m.bias, 0)
+
 class ResnetNodeClassifier(nn.Module):
     def __init__(self, args, device):
         super(ResnetNodeClassifier, self).__init__()
@@ -119,9 +124,9 @@ class SACDiscreteBaseline(nn.Module):
 
         #initialized optimizers
         self.policy_opt = optim.Adam(self.policyNetwork.parameters(), lr=args.lr)
-        # self.q1_opt = optim.Adam(self.q1network.parameters(), lr=args.lr)
-        # self.q2_opt = optim.Adam(self.q2network.parameters(), lr=args.lr)
-        self.q_opt = optim.Adam(itertools.chain(self.q1network.parameters(), self.q2network.parameters()), lr=args.lr)
+        self.q1_opt = optim.Adam(self.q1network.parameters(), lr=args.lr)
+        self.q2_opt = optim.Adam(self.q2network.parameters(), lr=args.lr)
+        # self.q_opt = optim.Adam(itertools.chain(self.q1network.parameters(), self.q2network.parameters()), lr=args.lr)
 
         #init loss function
         self.q_loss_func=nn.MSELoss()
@@ -179,20 +184,20 @@ class SACDiscreteBaseline(nn.Module):
         action = action.to(self.device)
 
         # compute q networks loss and backprop it
-        self.q_opt.zero_grad()
-        # self.q2_opt.zero_grad()
+        self.q1_opt.zero_grad()
+        self.q2_opt.zero_grad()
         q_target = self.computeQTargets(sample)
         q1_out = self.q1network(img_feats, action)[torch.where(action==1)].reshape(-1,1) #
         q2_out = self.q2network(img_feats, action)[torch.where(action==1)].reshape(-1,1) #
         q1_loss = self.q_loss_func(q1_out, q_target)
         q2_loss = self.q_loss_func(q2_out, q_target)
-        q_loss = q1_loss + q2_loss #torch.clamp(q1_loss + q2_loss,-10,10) #TODO: determine how to fix besides reward clipping?
+        # q_loss = q1_loss + q2_loss #torch.clamp(q1_loss + q2_loss,-10,10) #TODO: determine how to fix besides reward clipping?
         # q_loss = torch.min(q1_loss, q2_loss)
-        q_loss.backward()#retain_graph=True)
-        # q1_loss.backward()
-        # q2_loss.backward()
-        self.q_opt.step()
-        # self.q2_opt.step()
+        # q_loss.backward()#retain_graph=True)
+        q1_loss.backward()
+        q2_loss.backward()
+        self.q1_opt.step()
+        self.q2_opt.step()
 
         # freeze q weights to ease policy network backprop computation
         for param in self.q1network.parameters():
@@ -212,7 +217,7 @@ class SACDiscreteBaseline(nn.Module):
         policy_loss.backward()
         self.policy_opt.step()
 
-        # print('feats+q',img_feats.mean(), q1_out.mean(),q2_out.mean())
+        # print('q vals + targ', q1_out.mean(),q2_out.mean(), q_target.mean())
 
         #update target q networks; done before grad turned back on so no loss props to the target networks
         with torch.no_grad():
@@ -260,9 +265,9 @@ class QNetwork(nn.Module):
         self.prelu1 = ReLU()
         self.prelu2 = ReLU()
 
-        # weights_init_(self.fc1)
-        # weights_init_(self.fc2)
-        # weights_init_(self.fc3)
+        weights_init_(self.fc1)
+        weights_init_(self.fc2)
+        weights_init_(self.fc3)
 
     def forward(self, img_feats, action):
         feats = self.prelu1(self.fc1(torch.cat((img_feats, action), axis=-1)))
@@ -286,9 +291,9 @@ class PolicyNetwork(nn.Module):
         self.prelu2 = ReLU()
         self.sigmoid = Sigmoid()
 
-        # weights_init_(self.fc1)
-        # weights_init_(self.fc2)
-        # weights_init_(self.logits)
+        weights_init_(self.fc1)
+        weights_init_(self.fc2)
+        weights_init_(self.logits)
 
     def forward(self, img_feats):
         #extracts features from the image observation
@@ -368,7 +373,15 @@ class GoalReplayBuffer():
             breakpoint()
 
     def addSample(self, sample):
-        #sample of the shape (s, a, r, g, s', done)
+        # sample of the shape (s, a, r, g, s', done)
         self.buffer.append(sample)
         while len(self.buffer)>self.limit:
             self.buffer.pop(0)
+
+    # Hindsight Experience Replay
+    def addHERSample(self, sample, new_reward):
+        # sample of the form s, a, r, g, s', done
+        sample[3] = sample[4]  # replace old goal with next state (as if trying to get there the whole time)
+        sample[2] = new_reward  # replace old reward with success reward (bc achieved the goal)
+        sample[5] = True  # changing done to True because goal reached
+        self.addSample(sample)
