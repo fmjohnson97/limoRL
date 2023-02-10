@@ -1,3 +1,4 @@
+import os
 import cv2
 import json
 
@@ -158,12 +159,22 @@ def makeNodeAngleListFile(node_photo_folder):
     with open('nodeAngleKey.json', 'a') as f:
         json.dump(node_angle_key,f)
 
-def resizeAllImages(node_photo_folder):
+def resizeAllImages(node_photo_folder, new_folder):
     all_photo_files = glob(node_photo_folder+'*/*.png')
     for file in all_photo_files:
-        image = Image.load(file)
-        breakpoint()
-        .resize((img.width // 2, img.height // 2))
+        with Image.open(file) as img:
+            img_new =img.resize((img.width // 4, img.height // 4))
+            if not os.path.exists(new_folder+file.split('/')[1]+'/'):
+                os.makedirs(new_folder+file.split('/')[1]+'/')
+            img_new.save(new_folder+file.split('Photos')[-1][1:])
+
+def copyLabelsJsonFiles(old_node_folder, new_node_folder):
+    all_node_folders = glob(old_node_folder+'*')
+    for folder in all_node_folders:
+        with open(folder+'/labels.json') as f:
+            labels = json.load(f)
+        with open(new_node_folder+folder.split('/')[1]+'/labels.json','w') as f:
+            json.dump(labels, f)
 
 if __name__=='__main__':
     # code to go from videos to data usable for nodeDataset.py
@@ -182,4 +193,6 @@ if __name__=='__main__':
 
     # makeNodeAngleListFile(photo_folders)
 
-    resizeAllImages('nodePhotos/')
+    # resize all the images and copy over the labels json files
+    resizeAllImages('nodePhotos/', 'nodePhotosSmall/')
+    copyLabelsJsonFiles('nodePhotos/', 'nodePhotosSmall/')

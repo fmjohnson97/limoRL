@@ -131,13 +131,20 @@ class GraphTraverser():
 
     def setGoalNode(self, goal=None, direction=None):
         if goal is None:
+            # this is for going 2 nodes away
+            # first_level_reachable = self.graph.getAllNeighbors(self.current_node)
+            # second_level_reachable = []
+            # for node_info in first_level_reachable:
+            #     second_level_reachable.extend(self.graph.getAllNeighbors(node_info[1]))
+            # choice = random.choice(second_level_reachable)
+            # self.goalNode = choice[1]
+            # self.goalDirection = choice[2]
+
+            # this is for going 1 node away
             first_level_reachable = self.graph.getAllNeighbors(self.current_node)
-            second_level_reachable = []
-            for node_info in first_level_reachable:
-                second_level_reachable.extend(self.graph.getAllNeighbors(node_info[1]))
-            choice = random.choice(second_level_reachable)
+            choice = random.choice(first_level_reachable)
             self.goalNode = choice[1]
-            self.goalDirection = choice[2]
+            self.goalDirection = random.choice(range(0,360,5)) #TODO: expand to all angles maybe?
         else:
             self.goalNode = goal
             self.goalDirection=direction
