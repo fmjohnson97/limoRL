@@ -1,6 +1,7 @@
 import cv2
 import json
 
+from PIL import Image
 from glob import glob
 from tqdm import tqdm
 from collections import defaultdict
@@ -157,6 +158,13 @@ def makeNodeAngleListFile(node_photo_folder):
     with open('nodeAngleKey.json', 'a') as f:
         json.dump(node_angle_key,f)
 
+def resizeAllImages(node_photo_folder):
+    all_photo_files = glob(node_photo_folder+'*/*.png')
+    for file in all_photo_files:
+        image = Image.load(file)
+        breakpoint()
+        .resize((img.width // 2, img.height // 2))
+
 if __name__=='__main__':
     # code to go from videos to data usable for nodeDataset.py
 
@@ -167,11 +175,11 @@ if __name__=='__main__':
     #     saveVideoFrames(vfile,'nodePhotos/'+save_path+'/')
 
     # interpolate angle labels for images on the nodes
-    photo_folders = glob('nodePhotos/*')
+    # photo_folders = glob('nodePhotos/*')
     # for folder in photo_folders:
     #     interpolateFrameAngleLabels(folder+'/labels.json')
     #     createLabelSplits(folder+'/labels.json')
 
-    makeNodeAngleListFile(photo_folders)
+    # makeNodeAngleListFile(photo_folders)
 
-    #TODO: resize all images
+    resizeAllImages('nodePhotos/')

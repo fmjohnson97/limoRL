@@ -1,6 +1,7 @@
 import random
 import time
 import json
+import cv2
 import numpy as np
 
 from glob import glob
@@ -63,7 +64,9 @@ class Graph():
             heading = (heading + 1) % 360
 
         choice = random.choice(self.angleKey[str(vertex_num)][str(heading)])
-        return Image.open(self.vertices[vertex_num - 1] + 'node' + str(vertex_num) + '_' + choice + self.config['photoExtension'])
+        # breakpoint()
+        image = cv2.imread(self.vertices[vertex_num - 1] + 'node' + str(vertex_num) + '_' + choice + self.config['photoExtension'])
+        return image
 
     def addNode(self, nodeFeatures=None, nodeFeatPath=None):
         if nodeFeatures is None:
