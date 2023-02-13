@@ -38,7 +38,7 @@ class AllNodePhotosData(Dataset):
         else:
             item = self.paths[item]
 
-        return cv2.imread(item)[:,:,::-1]
+        return cv2.imread(item)#[:,:,::-1]
 
 if __name__=='__main__':
     print('total files:',len(glob('nodePhotosSmall/*/*.png')))
