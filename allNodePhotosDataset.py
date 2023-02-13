@@ -28,7 +28,7 @@ class AllNodePhotosData(Dataset):
         return len(self.paths)
 
     def __getitem__(self, item):
-        image = cv2.imread(self.paths[item])[:,:,::-1]
+        image = cv2.imread(self.paths[item])#[:,:,::-1]
 
         return image #TODO: also return the node number and the image number?
 
