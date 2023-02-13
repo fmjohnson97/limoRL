@@ -2,6 +2,7 @@ import torch
 import argparse
 import torch.optim as optim
 import torch.nn as nn
+import numpy as np
 
 from torch.utils.data import DataLoader
 from torchvision.models import ResNet18_Weights
@@ -38,6 +39,7 @@ def train(args, device):
     valLoader = DataLoader(valData, batch_size=args.batch_size, shuffle=True)
 
     transforms = ResNet18_Weights.DEFAULT.transforms()
+    best_val = np.inf
 
     for e in range(args.epochs):
         epoch_loss = 0
@@ -54,7 +56,11 @@ def train(args, device):
             decOpt.step()
             epoch_loss+=loss.item()
         print('Epoch',e,'Train loss:',epoch_loss,'Avg train loss:',epoch_loss/len(trainData))
-        test(encoder, decoder, device, valLoader, len(valData),'val')
+        val_loss = test(encoder, decoder, device, valLoader, len(valData),'val')
+        if val_loss < best_val:
+            torch.save(encoder.state_dict(), args.save_name+'_encoder.pt')
+            torch.save(decoder.state_dict(), args.save_name+'_decoder.pt')
+
 
     return encoder, decoder
 
@@ -74,6 +80,7 @@ def test(enc, dec, device, dataLoader, dataLen, name='Test'):
         loss = lossFunc(batch, output)
         total_loss += loss.item()
     print('\t',name,'loss:', total_loss, 'Avg',name,'loss:', total_loss / dataLen)
+    return total_loss
 
 
 if __name__ == '__main__':
