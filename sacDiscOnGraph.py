@@ -29,7 +29,7 @@ def getArgs():
     # sac hyperparameters
     parser.add_argument('--gamma', type=float, default=0.99, help='discount factor for SAC RL')
     parser.add_argument('--alpha', type=float, default=0.2, help='discount factor for entropy for sac')
-    parser.add_argument('--polyak', type=float, default=0.98, help='polyak averaging parameter')#.995???
+    parser.add_argument('--polyak', type=float, default=0.995, help='polyak averaging parameter')
 
     # resnet backbone args
     parser.add_argument('--return_node', type=str, default='layer4', choices=['layer1','layer2','layer3','layer4'], help='resnet layer to return features from')
