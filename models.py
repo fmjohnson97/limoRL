@@ -419,6 +419,7 @@ class Encoder(nn.Module):
         )
 
     def forward(self, x):
+        # breakpoint()
         x = self.encoder_cnn(x)
         x = self.flatten(x)
         x = self.encoder_lin(x)
@@ -450,6 +451,7 @@ class Decoder(nn.Module):
         )
 
     def forward(self, x):
+        # breakpoint()
         x = self.decoder_lin(x)
         x = self.unflatten(x)
         x = self.decoder_conv(x)

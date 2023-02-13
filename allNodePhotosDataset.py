@@ -1,4 +1,6 @@
 import cv2
+import random
+import torch
 import numpy as np
 from glob import glob
 from torch.utils.data import Dataset
@@ -26,9 +28,17 @@ class AllNodePhotosData(Dataset):
         return len(self.paths)
 
     def __getitem__(self, item):
-        image = cv2.imread(self.paths[item])
+        image = cv2.imread(self.paths[item])[:,:,::-1]
 
         return image #TODO: also return the node number and the image number?
+
+    def getRandom(self, item=None):
+        if item is None:
+            item = random.choice(self.paths)
+        else:
+            item = self.paths[item]
+
+        return cv2.imread(item)[:,:,::-1]
 
 if __name__=='__main__':
     print('total files:',len(glob('nodePhotosSmall/*/*.png')))
