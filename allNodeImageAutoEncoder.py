@@ -64,6 +64,7 @@ def train(args, device, transforms):
             print('Latest Checkpoint is Epoch',e)
             torch.save(encoder.state_dict(), args.save_name+'_encoder.pt')
             torch.save(decoder.state_dict(), args.save_name+'_decoder.pt')
+            best_val=val_loss
 
     return encoder, decoder
 
