@@ -416,7 +416,7 @@ class Encoder(nn.Module):
         self.flatten = Flatten(start_dim=1)
         ### Linear section
         self.encoder_lin = Sequential(
-            Linear(27 * 27 * 64, 128),
+            Linear(13 * 13 * 64, 128),
             ReLU(True),
             Linear(128, encoded_space_dim)
         )
@@ -437,14 +437,14 @@ class Decoder(nn.Module):
         self.decoder_lin = Sequential(
             Linear(encoded_space_dim, 128),
             ReLU(True),
-            Linear(128, 27 * 27 * 64),
+            Linear(128, 13 * 13 * 64),
             ReLU(True)
         )
 
-        self.unflatten = Unflatten(dim=1, unflattened_size=(64, 27, 27))
+        self.unflatten = Unflatten(dim=1, unflattened_size=(64, 13, 13))
 
         self.decoder_conv = Sequential(
-            ConvTranspose2d(64, 32, 3, stride=2, output_padding=1),
+            ConvTranspose2d(64, 32, 3, stride=2, output_padding=0),
             BatchNorm2d(32),
             ReLU(True),
             ConvTranspose2d(32, 16, 3, stride=2, output_padding=1),
