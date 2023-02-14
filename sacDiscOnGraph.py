@@ -74,6 +74,7 @@ def train(args, device):
     transforms = ResNet18_Weights.DEFAULT.transforms()
     img_backbone = Encoder32(args.hidden_dim, transforms, device)
     img_backbone.load_state_dict(torch.load('allNodePhotoAE_'+str(args.hidden_dim)+'hid_encoder.pt', map_location=torch.device('cpu')))
+    img_backbone = img_backbone.to(device)
     img_backbone.eval()
     model = SACDiscreteBaseline(args, img_backbone, env.action_space, device)
     model.train()
