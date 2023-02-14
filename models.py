@@ -102,7 +102,7 @@ class SACDiscreteBaseline(nn.Module):
         self.backbone=backbone
         # initialize networks
         # note: all using a shared feature extractor which isn't getting any loss backprop-ed
-        feat_dim= 512 * 7 * 7 * 2 #*2 is for goal # cnn 4096# fc 2048 # resnet 512 * 7 * 7
+        feat_dim= 2*args.hidden_dim #512 * 7 * 7 * 2 #*2 is for goal # cnn 4096# fc 2048 # resnet 512 * 7 * 7
         # self.img_fc = Linear(96*96*3,feat_dim).to(device)
         # self.img_fc = nn.Sequential(Conv2d(3, 32, kernel_size=8, stride=4, padding=0), ReLU(),
         #                             Conv2d(32, 64, kernel_size=4, stride=2, padding=0), ReLU(),
