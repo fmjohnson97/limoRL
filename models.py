@@ -406,7 +406,7 @@ class Encoder(nn.Module):
             BatchNorm2d(16),
             ReLU(True),
             Conv2d(16, 32, 3, stride=2, padding=0),
-            BatchNorm2d(16),
+            BatchNorm2d(32),
             ReLU(True),
             Conv2d(32, 64, 3, stride=2, padding=0),
             ReLU(True)
@@ -445,7 +445,7 @@ class Decoder(nn.Module):
 
         self.decoder_conv = Sequential(
             ConvTranspose2d(64, 32, 3, stride=2, output_padding=1),
-            BatchNorm2d(16),
+            BatchNorm2d(32),
             ReLU(True),
             ConvTranspose2d(32, 16, 3, stride=2, output_padding=1),
             BatchNorm2d(16),
