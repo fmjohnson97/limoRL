@@ -69,12 +69,12 @@ class ResnetBackbone():
                     im = Image.fromarray(im.cpu().numpy().astype(np.uint8))
                 else:
                     im = Image.fromarray(im)
-                img_ext.append(torch.FloatTensor(self.preprocess(im)))
+                img_ext.append(torch.tensor(self.preprocess(im)))
             img_ext=torch.stack(img_ext).to(self.device)
         else:
             # breakpoint()
             try:
-                img_ext=torch.FloatTensor(img).unsqueeze(0).to(self.device)
+                img_ext=torch.tensor(img).unsqueeze(0).to(self.device)
             except Exception as e:
                 print(e)
                 breakpoint()
@@ -166,7 +166,7 @@ class SACDiscreteBaseline(nn.Module):
         targetq2_out = self.targetQ2(img_new_feats, action_new)
         q_targ_out = torch.min(targetq1_out, targetq2_out)
 
-        q_target = torch.FloatTensor(reward + self.gamma * (1-done) * np.sum((q_targ_out.cpu().numpy() - self.alpha * log_action_new.cpu().numpy())*action_new.cpu().numpy(), axis=-1))#TODO: ???
+        q_target = torch.tensor(reward + self.gamma * (1-done) * np.sum((q_targ_out.cpu().numpy() - self.alpha * log_action_new.cpu().numpy())*action_new.cpu().numpy(), axis=-1))#TODO: ???
         q_target = q_target.reshape(len(q_target),-1).to(self.device)
         return q_target
 
@@ -180,7 +180,7 @@ class SACDiscreteBaseline(nn.Module):
         img_feats = self.backbone.extractFeatures(observation) #self.prelu(self.img_fc(observation)) #
         goal_feats = self.backbone.extractFeatures(goal_imgs)
         img_feats = torch.cat((img_feats,goal_feats), axis=-1)
-        action = torch.FloatTensor(action)#.reshape(-1,1)
+        action = torch.tensor(action)#.reshape(-1,1)
         action = action.to(self.device)
 
         # compute q networks loss and backprop it
