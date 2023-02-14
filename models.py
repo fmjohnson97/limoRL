@@ -472,7 +472,7 @@ class Encoder32(nn.Module):
     @torch.no_grad()
     def extractFeatures(self, img):
         img = torch.tensor(img).transpose(-1, 1)
-        img_ext = self.transforms(img)
+        img_ext = self.transforms(img).to(self.device)
         features = self.forward(img_ext)
         return features
 
