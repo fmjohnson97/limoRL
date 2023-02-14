@@ -3,7 +3,9 @@ import torch
 import argparse
 import numpy as np
 
-from models import SACDiscreteBaseline, ResnetBackbone, GoalReplayBuffer
+from torchvision.models import ResNet18_Weights
+
+from models import SACDiscreteBaseline, ResnetBackbone, GoalReplayBuffer, Encoder32
 from graph import GraphTraverser, Graph
 
 def getArgs():
@@ -31,8 +33,9 @@ def getArgs():
     parser.add_argument('--alpha', type=float, default=0.2, help='discount factor for entropy for sac')
     parser.add_argument('--polyak', type=float, default=0.995, help='polyak averaging parameter')
 
-    # resnet backbone args
+    # resnet/backbone args
     parser.add_argument('--return_node', type=str, default='layer4', choices=['layer1','layer2','layer3','layer4'], help='resnet layer to return features from')
+    parser.add_argument('--hidden_dim', type=int, default=128, help='size of the latent vector of the AE')
 
     return parser.parse_args()
 
@@ -68,6 +71,10 @@ def train(args, device):
 
     # initialize the model
     img_backbone = ResnetBackbone(args, device)
+    # transforms = ResNet18_Weights.DEFAULT.transforms()
+    # img_backbone = Encoder32(args.hidden_dim, transforms, device)
+    # img_backbone.load_state_dict(torch.load('allNodePhotoAE_'+str(args.hidden_dim)+'hid_encoder.pt', map_location=torch.device('cpu')))
+    # img_backbone.eval()
     model = SACDiscreteBaseline(args, img_backbone, env.action_space, device)
     model.train()
 
@@ -142,7 +149,7 @@ if __name__ == '__main__':
     np.random.seed(525)
 
     args = getArgs()
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
     model = train(args, device)
 

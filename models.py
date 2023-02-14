@@ -428,6 +428,49 @@ class Encoder(nn.Module):
         x = self.encoder_lin(x)
         return x
 
+class Encoder32(nn.Module):
+    # borrowed from here: https://medium.com/dataseries/convolutional-autoencoder-in-pytorch-on-mnist-dataset-d65145c132ac
+
+    def __init__(self, encoded_space_dim, transforms = None, device = None):
+        super().__init__()
+
+        self.transforms = transforms
+        self.device = device
+
+        ### Convolutional section
+        self.encoder_cnn = Sequential(
+            Conv2d(3, 8, 3, stride=2, padding=1),
+            ReLU(True),
+            Conv2d(8, 16, 3, stride=2, padding=1),
+            BatchNorm2d(16),
+            ReLU(True),
+            Conv2d(16, 32, 3, stride=2, padding=0),
+            ReLU(True)
+        )
+
+        ### Flatten layer
+        self.flatten = Flatten(start_dim=1)
+        ### Linear section
+        self.encoder_lin = Sequential(
+            Linear(27 * 27 * 32, 128),
+            ReLU(True),
+            Linear(128, encoded_space_dim)
+        )
+
+    def forward(self, x):
+        # breakpoint()
+        x = self.encoder_cnn(x)
+        x = self.flatten(x)
+        x = self.encoder_lin(x)
+        return x
+
+    @torch.no_grad()
+    def extractFeatures(self, img):
+        img = torch.tensor(img).transpose(-1, 1)
+        img_ext = self.transforms(img)
+        features = self.forward(img_ext)
+        return features
+
 
 class Decoder(nn.Module):
     #borrowed from here: https://medium.com/dataseries/convolutional-autoencoder-in-pytorch-on-mnist-dataset-d65145c132ac
@@ -447,6 +490,38 @@ class Decoder(nn.Module):
             ConvTranspose2d(64, 32, 3, stride=2, output_padding=0),
             BatchNorm2d(32),
             ReLU(True),
+            ConvTranspose2d(32, 16, 3, stride=2, output_padding=1),
+            BatchNorm2d(16),
+            ReLU(True),
+            ConvTranspose2d(16, 8, 3, stride=2, padding=1, output_padding=1),
+            BatchNorm2d(8),
+            ReLU(True),
+            ConvTranspose2d(8, 3, 3, stride=2, padding=1, output_padding=1)
+        )
+
+    def forward(self, x):
+        # breakpoint()
+        x = self.decoder_lin(x)
+        x = self.unflatten(x)
+        x = self.decoder_conv(x)
+        x = torch.sigmoid(x)
+        return x
+
+class Decoder32(nn.Module):
+    #borrowed from here: https://medium.com/dataseries/convolutional-autoencoder-in-pytorch-on-mnist-dataset-d65145c132ac
+
+    def __init__(self, encoded_space_dim):
+        super().__init__()
+        self.decoder_lin = Sequential(
+            Linear(encoded_space_dim, 128),
+            ReLU(True),
+            Linear(128, 27 * 27 * 32),
+            ReLU(True)
+        )
+
+        self.unflatten = Unflatten(dim=1, unflattened_size=(32, 27, 27))
+
+        self.decoder_conv = Sequential(
             ConvTranspose2d(32, 16, 3, stride=2, output_padding=1),
             BatchNorm2d(16),
             ReLU(True),
