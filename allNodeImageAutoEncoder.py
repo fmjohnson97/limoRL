@@ -46,7 +46,7 @@ def train(args, device, transforms):
     for e in range(args.epochs):
         epoch_loss = 0
         for batch in trainLoader:
-            batch = batch.transpose(-1,1).float()
+            batch = batch.transpose(-1,1)#.float()
             # breakpoint()
             # to shape [batch, 3, 224, 224]
             batch = transforms(batch).to(device)
