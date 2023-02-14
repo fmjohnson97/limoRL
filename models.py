@@ -55,31 +55,36 @@ class ResnetBackbone():
 
     @torch.no_grad()
     def extractFeatures(self, img):
-        if len(img.shape)>4:
-            temp = img
-            img = []
-            for t in temp:
-                img.extend(t)
-            img = torch.stack(img)
-        # breakpoint()
-        img_ext=[]
-        if len(img.shape)==4 and type(img) != Image:
-            for im in img:
-                if type(im)==torch.Tensor:
-                    im = Image.fromarray(im.cpu().numpy().astype(np.uint8))
-                else:
-                    im = Image.fromarray(im)
-                img_ext.append(torch.tensor(self.preprocess(im)))
-            img_ext=torch.stack(img_ext).to(self.device)
-        else:
-            # breakpoint()
-            try:
-                img_ext=torch.tensor(img).unsqueeze(0).to(self.device)
-            except Exception as e:
-                print(e)
-                breakpoint()
-
+        if len(img.shape)!=4:
+            breakpoint()
+        img = torch.tensor(img).transpose(-1, 1)
+        img_ext=self.preprocess(img).to(self.device)
         features = self.feat_ext(img_ext)
+        # if len(img.shape)>4:
+        #     temp = img
+        #     img = []
+        #     for t in temp:
+        #         img.extend(t)
+        #     img = torch.stack(img)
+        # # breakpoint()
+        # img_ext=[]
+        # if len(img.shape)==4 and type(img) != Image:
+        #     for im in img:
+        #         if type(im)==torch.Tensor:
+        #             im = Image.fromarray(im.cpu().numpy().astype(np.uint8))
+        #         else:
+        #             im = Image.fromarray(im)
+        #         img_ext.append(torch.tensor(self.preprocess(im)))
+        #     img_ext=torch.stack(img_ext).to(self.device)
+        # else:
+        #     # breakpoint()
+        #     try:
+        #         img_ext=torch.tensor(img).unsqueeze(0).to(self.device)
+        #     except Exception as e:
+        #         print(e)
+        #         breakpoint()
+        #
+        # features = self.feat_ext(img_ext)
         # breakpoint()
         return features[self.return_node].reshape(len(features[self.return_node]), -1)
 
@@ -105,10 +110,10 @@ class SACDiscreteBaseline(nn.Module):
         # self.prelu = PReLU().to(device)
         self.q1network = QNetwork(feat_dim, action_dim).to(device)
         self.targetQ1 = deepcopy(self.q1network)
-        self.targetQ1 = self.targetQ1.to(device)
+        # self.targetQ1 = self.targetQ1.to(device)
         self.q2network = QNetwork(feat_dim, action_dim).to(device)
         self.targetQ2 = deepcopy(self.q2network)
-        self.targetQ2 = self.targetQ2.to(device)
+        # self.targetQ2 = self.targetQ2.to(device)
         self.policyNetwork = PolicyNetwork(args, feat_dim, action_dim).to(device)
 
         # gathering hyperparameters
@@ -166,7 +171,7 @@ class SACDiscreteBaseline(nn.Module):
         targetq2_out = self.targetQ2(img_new_feats, action_new)
         q_targ_out = torch.min(targetq1_out, targetq2_out)
 
-        q_target = torch.tensor(reward + self.gamma * (1-done) * np.sum((q_targ_out.cpu().numpy() - self.alpha * log_action_new.cpu().numpy())*action_new.cpu().numpy(), axis=-1))#TODO: ???
+        q_target = torch.FloatTensor(reward + self.gamma * (1-done) * np.sum((q_targ_out.cpu().numpy() - self.alpha * log_action_new.cpu().numpy())*action_new.cpu().numpy(), axis=-1))#TODO: ???
         q_target = q_target.reshape(len(q_target),-1).to(self.device)
         return q_target
 
@@ -180,7 +185,7 @@ class SACDiscreteBaseline(nn.Module):
         img_feats = self.backbone.extractFeatures(observation) #self.prelu(self.img_fc(observation)) #
         goal_feats = self.backbone.extractFeatures(goal_imgs)
         img_feats = torch.cat((img_feats,goal_feats), axis=-1)
-        action = torch.tensor(action)#.reshape(-1,1)
+        action = torch.FloatTensor(action)#.reshape(-1,1)
         action = action.to(self.device)
 
         # compute q networks loss and backprop it
