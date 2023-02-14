@@ -21,7 +21,7 @@ def getArgs():
     # training hyperparameters
     parser.add_argument('--hidden_dim', type=int, default=128, help='size of the latent vector of the AE')
     parser.add_argument('--batch_size', type=int, default=32, help='number of samples used to update the networks at once')
-    parser.add_argument('--epochs', type=int, default=5000, help='number of epochs for training')
+    parser.add_argument('--epochs', type=int, default=500, help='number of epochs for training')
     parser.add_argument('--lr', type=float, default=1e-4, help='learning rate for training')
     parser.add_argument('--save_name', default='allNodePhotoAE', help='prefix name for saving the SAC networks')
 
@@ -111,13 +111,13 @@ if __name__ == '__main__':
     args = getArgs()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     transforms = ResNet18_Weights.DEFAULT.transforms()
-    encoder, decoder = train(args, device, transforms)
-    testData = AllNodePhotosData(args.node_folder,'test')
-    testLoader = DataLoader(testData, batch_size=args.batch_size, shuffle=True)
-    test(encoder, decoder, device, transforms, testLoader, len(testData))
+    # encoder, decoder = train(args, device, transforms)
+    # testData = AllNodePhotosData(args.node_folder,'test')
+    # testLoader = DataLoader(testData, batch_size=args.batch_size, shuffle=True)
+    # test(encoder, decoder, device, transforms, testLoader, len(testData))
 
-    # encoder = Encoder(args.hidden_dim)
-    # decoder = Decoder(args.hidden_dim)
+    encoder = Encoder(args.hidden_dim)
+    decoder = Decoder(args.hidden_dim)
 
     encoder.load_state_dict(torch.load(args.save_name+'_encoder.pt', map_location=torch.device('cpu')))
     decoder.load_state_dict(torch.load(args.save_name + '_decoder.pt',map_location=torch.device('cpu')))
