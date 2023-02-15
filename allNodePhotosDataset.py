@@ -28,7 +28,8 @@ class AllNodePhotosData(Dataset):
         return len(self.paths)
 
     def __getitem__(self, item):
-        image = cv2.imread(self.paths[item])#[:,:,::-1]
+        image = cv2.imread(self.paths[item])
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
         return image #TODO: also return the node number and the image number?
 
@@ -38,7 +39,10 @@ class AllNodePhotosData(Dataset):
         else:
             item = self.paths[item]
 
-        return cv2.imread(item)#[:,:,::-1]
+        image = cv2.imread(item)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+        return image
 
 if __name__=='__main__':
     print('total files:',len(glob('nodePhotosSmall/*/*.png')))

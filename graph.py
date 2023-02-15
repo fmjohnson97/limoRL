@@ -5,9 +5,11 @@ import cv2
 import numpy as np
 
 from glob import glob
-from pynput import keyboard
-from pynput.keyboard import Key
-from PIL import Image
+try:
+    from pynput import keyboard
+    from pynput.keyboard import Key
+except:
+    pass
 from matplotlib import pyplot as plt
 
 class Graph():

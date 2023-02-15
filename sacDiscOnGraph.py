@@ -59,7 +59,7 @@ def train(args, device):
         action[action_ind] = 1
         # goal info is currently (start node,  star dir, goal node, goal dir)
         # getting the goal images to save instead of the goal info (since that's really for debug purposes tbh)
-        goal_img = env.getImg(goal_info[-2], goal_info[-1])
+        goal_img = env.getGoalImg()
         # sample of the shape (s, a, r, g, s', done)
         replay_buffer.addSample([obs, action, reward, goal_img, obs_new, done])
         # implementing hindsight experience replay
@@ -93,7 +93,6 @@ def train(args, device):
         if step < args.use_policy_step:
             action = random.choice(range(env.action_space))
         else:
-            breakpoint()
             goal_img = env.getGoalImg()
             action = model.get_action(np.stack([obs]), np.stack([goal_img]))
 
