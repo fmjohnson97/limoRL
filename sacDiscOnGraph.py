@@ -22,6 +22,7 @@ def getArgs():
     parser.add_argument('--lr', type=float, default=1e-5, help='learning rate for training')
     parser.add_argument('--save_name', default='sacDiscOnGraph', help='prefix name for saving the SAC networks')
     parser.add_argument('--target_update_freq', type=int, default=10, help='max number of samples in the replay buffer')
+    parser.add_argument('--dist_reward', action='store_true', help='use the distance reward instead')
 
     # buffer hyperparameters
     parser.add_argument('--buffer_limit', type=int, default=400000, help='max number of samples in the replay buffer')
@@ -42,7 +43,7 @@ def getArgs():
 
 def train(args, device):
     # initialize the environment and get the first observation
-    env = GraphTraverser(Graph(config_path=args.config_file))
+    env = GraphTraverser(Graph(config_path=args.config_file), distance_reward=args.dist_reward)
     obs = env.getImg()
 
     #TODO: need to make SAC goal conditioned when getting actions!
