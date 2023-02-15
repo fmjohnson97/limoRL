@@ -103,13 +103,14 @@ class Graph():
         pass
 
 class GraphTraverser():
-    def __init__(self, graph: Graph, start_node=1, base_turn_angle=15, plotImgs=False, recordActions=False, human=False):
+    def __init__(self, graph: Graph, start_node=1, base_turn_angle=15, plotImgs=False, recordActions=False, distance_reward = True, human=False):
         self.graph = graph
         self.start_node = start_node
         self.base_turn_angle = base_turn_angle
         self.plotImgs = plotImgs
         self.recordActions = recordActions
         self.action_space = 4
+        self.distance_reward = distance_reward
         self.human = human #whether the traversal is by a human (true) or an RL agent (false)
         self.reset()
 
@@ -145,6 +146,7 @@ class GraphTraverser():
             choice = random.choice(first_level_reachable)
             self.goalNode = choice[1]
             self.goalDirection = random.choice(range(0,360,5)) #TODO: expand to all angles maybe?
+            #TODO: change distance reward if you go back to the multi step goal
         else:
             self.goalNode = goal
             self.goalDirection=direction
@@ -176,9 +178,15 @@ class GraphTraverser():
         return image, reward, (start, start_dir, goal, goal_dir), reward==1
 
     def checkGoal(self, reward):
-        if self.current_node == self.goalNode and abs(self.current_direction-self.goalDirection)<self.base_turn_angle:
+        if self.current_node == self.goalNode:# and abs(self.current_direction-self.goalDirection)<self.base_turn_angle:
             return 1
-        return reward#/10
+        elif self.distance_reward:
+            #TODO: add angle to reward if that comes back up
+            node1pos=self.graph.config['positions'][str(self.current_node)]
+            node2pos = self.graph.config['positions'][str(self.goalNode)]
+            return -((node2pos[0]-node1pos[0])**2+(node2pos[1]-node1pos[1])**2)**0.5
+        else:
+            return reward#/10
 
     def on_key_release(self, key):
         #https://pynput.readthedocs.io/en/latest/keyboard.html#monitoring-the-keyboard

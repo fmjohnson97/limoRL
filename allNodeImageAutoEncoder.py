@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 from torchvision.models import ResNet18_Weights
 from matplotlib import pyplot as plt
 
-from models import Encoder, Decoder
+from models import *
 from allNodePhotosDataset import AllNodePhotosData
 
 def getArgs():
@@ -111,13 +111,13 @@ if __name__ == '__main__':
     args = getArgs()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     transforms = ResNet18_Weights.DEFAULT.transforms()
-    encoder, decoder = train(args, device, transforms)
-    testData = AllNodePhotosData(args.node_folder,'test')
-    testLoader = DataLoader(testData, batch_size=args.batch_size, shuffle=True)
-    test(encoder, decoder, device, transforms, testLoader, len(testData))
+    # encoder, decoder = train(args, device, transforms)
+    # testData = AllNodePhotosData(args.node_folder,'test')
+    # testLoader = DataLoader(testData, batch_size=args.batch_size, shuffle=True)
+    # test(encoder, decoder, device, transforms, testLoader, len(testData))
 
-    # encoder = Encoder(args.hidden_dim)
-    # decoder = Decoder(args.hidden_dim)
+    encoder = Encoder32(args.hidden_dim)
+    decoder = Decoder32(args.hidden_dim)
 
     encoder.load_state_dict(torch.load(args.save_name+'_encoder.pt', map_location=torch.device('cpu')))
     decoder.load_state_dict(torch.load(args.save_name + '_decoder.pt',map_location=torch.device('cpu')))
