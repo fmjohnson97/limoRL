@@ -92,7 +92,8 @@ def train(args, device):
         if step < args.use_policy_step:
             action = random.choice(range(env.action_space))
         else:
-            goal_img = env.getImg()
+            breakpoint()
+            goal_img = env.getGoalImg()
             action = model.get_action(np.stack([obs]), np.stack([goal_img]))
 
         # take action in the environment and save to replay/update trackers
@@ -151,6 +152,23 @@ def test(args, device, model=None):
     if model is None:
         img_backbone = ResnetBackbone(args, device)
         model = SACDiscreteBaseline(args, img_backbone, env.action_space, device)
+        model.load_states(args)
+
+    env.randomInit()
+    obs = env.getImg()
+    done = False
+    step = 0
+    total_reward = 0
+    actions = []
+    start = [env.current_node, env.current_direction]
+    goal = [env.goalNode, env.goalDirection]
+    print('Start: Node',env.current_node,',',env.current_direction,'degrees')
+    print('Goal: Node', env.goalNode, ',', env.goalDirection, 'degrees')
+
+    while not done and step < args.steps_per_epoch:
+        goal_img = env.getImg()
+        action = model.get_action(np.stack([obs]), np.stack([goal_img]))
+
 
 if __name__ == '__main__':
     torch.manual_seed(525)

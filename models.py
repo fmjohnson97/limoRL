@@ -257,6 +257,19 @@ class SACDiscreteBaseline(nn.Module):
             torch.save(self.q2network.state_dict(), name+'_q2.pt')
             torch.save(self.policyNetwork.state_dict(), name+'_policy.pt')
 
+    def load_states(self, args):
+        self.policyNetwork.load_state_dict(torch.load(args.save_name + '_policy.pt', map_location=torch.device('cpu')))
+        self.q1network.load_state_dict(torch.load(args.save_name + '_q1.pt', map_location=torch.device('cpu')))
+        self.targetQ1 = deepcopy(self.q1network)
+        self.q1network.load_state_dict(torch.load(args.save_name + '_q2.pt', map_location=torch.device('cpu')))
+        self.targetQ2 = deepcopy(self.q2network)
+
+        # freeze target weights bc only updating with polyak averaging
+        for param in self.targetQ1.parameters():
+            param.requires_grad = False
+        for param in self.targetQ2.parameters():
+            param.requires_grad = False
+
 
 class QNetwork(nn.Module):
     def __init__(self, feat_dim, action_dim):

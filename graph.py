@@ -302,6 +302,9 @@ class GraphTraverser():
             # breakpoint()
         return image
 
+    def getGoalImg(self):
+        return self.getImg(self.goalNode,self.goalDirection)
+
     def render(self):
         #TODO: keep track of the figure so the slowdown stops happening
         image = self.getImg()
