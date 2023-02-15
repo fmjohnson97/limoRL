@@ -145,6 +145,13 @@ def train(args, device):
 
     return model
 
+def test(args, device, model=None):
+    env = GraphTraverser(Graph(config_path=args.config_file))
+
+    if model is None:
+        img_backbone = ResnetBackbone(args, device)
+        model = SACDiscreteBaseline(args, img_backbone, env.action_space, device)
+
 if __name__ == '__main__':
     torch.manual_seed(525)
     np.random.seed(525)

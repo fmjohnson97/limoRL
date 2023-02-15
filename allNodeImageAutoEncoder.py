@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 from torchvision.models import ResNet18_Weights
 from matplotlib import pyplot as plt
 
-from models import *
+from models import Encoder, Decoder, Encoder32, Decoder32, Encoder2, Decoder2
 from allNodePhotosDataset import AllNodePhotosData
 
 def getArgs():
@@ -29,8 +29,8 @@ def getArgs():
     return parser.parse_args()
 
 def train(args, device, transforms):
-    encoder = Encoder(args.hidden_dim).to(device)
-    decoder = Decoder(args.hidden_dim).to(device)
+    encoder = Encoder2(3, 32, args.hidden_dim).to(device)
+    decoder = Decoder2(3, 32, args.hidden_dim).to(device)
 
     encOpt = optim.Adam(encoder.parameters(), lr=args.lr)
     decOpt = optim.Adam(decoder.parameters(), lr=args.lr)
@@ -111,13 +111,13 @@ if __name__ == '__main__':
     args = getArgs()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     transforms = ResNet18_Weights.DEFAULT.transforms()
-    # encoder, decoder = train(args, device, transforms)
-    # testData = AllNodePhotosData(args.node_folder,'test')
-    # testLoader = DataLoader(testData, batch_size=args.batch_size, shuffle=True)
-    # test(encoder, decoder, device, transforms, testLoader, len(testData))
+    encoder, decoder = train(args, device, transforms)
+    testData = AllNodePhotosData(args.node_folder,'test')
+    testLoader = DataLoader(testData, batch_size=args.batch_size, shuffle=True)
+    test(encoder, decoder, device, transforms, testLoader, len(testData))
 
-    encoder = Encoder32(args.hidden_dim)
-    decoder = Decoder32(args.hidden_dim)
+    # encoder = Encoder2(args.hidden_dim)
+    # decoder = Decoder2(args.hidden_dim)
 
     encoder.load_state_dict(torch.load(args.save_name+'_encoder.pt', map_location=torch.device('cpu')))
     decoder.load_state_dict(torch.load(args.save_name + '_decoder.pt',map_location=torch.device('cpu')))
