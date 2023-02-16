@@ -56,7 +56,7 @@ class Graph():
         return [x for x in self.config['transitions'][current_node-1] if abs(x[2]-current_direction)<angle_threshold]
 
     def getAllNeighbors(self, current_node):
-        return [x for x in self.config['transitions'][current_node - 1]]
+        return self.config['transitions'][current_node - 1]
 
     def getVertexFeats(self, vertex_num, heading=None, heading_threshold=1):
         if heading is None:
@@ -100,9 +100,64 @@ class Graph():
         print("remove node function not implemented!!!")
         pass
 
-    def findPath(self, start_node, end_node):
-        print('find path function not implemented!!!')
-        pass
+    def findPath(self, start_node, end_node,start_direction=None, end_direction=None, base_angle = 15):
+        path = [start_node]
+        actions = []
+
+        next_nodes = self.getAllNeighbors(start_node)
+        neighbors = [x[1] for x in next_nodes]
+
+        if start_node == end_node:
+            # breakpoint()
+            if start_direction is not None and end_direction is not None:
+                return [[end_node],self.computeRotationActions(start_direction, end_direction, base_angle)]
+            return [[end_node],[]]
+        elif end_node in neighbors:
+            # breakpoint()
+            node = [x for x in next_nodes if x[1]==end_node][0]
+            next_steps = self.findPath(end_node, end_node, node[2], end_direction)
+            path.append(node)
+            path.extend(next_steps[0])
+            # path.append(start_node)
+            actions.extend(self.computeRotationActions(start_direction, node[2], base_angle))
+            actions.append('move forward')
+            actions.extend(next_steps[1])
+            return [path, actions]
+        else:
+            breakpoint()
+            next_steps=[]
+            for node in next_nodes:
+                next_steps.append(self.findPath(node[1], end_node,start_direction,node[2]))
+            step_lens = [[len(x[1]),i] for i,x in enumerate(next_steps) if len(x[1])>0]
+            breakpoint()
+            path.extend(next_steps[0])
+            actions.extend(next_steps[1])
+            actions.append('move forward')
+
+            return [path, actions]
+
+
+        if start_direction is not None:
+            rotation_action_list = self.computeRotationActions(start_direction, )
+            actions.extend(rotation_action_list)
+
+
+
+        if end_direction is not None:
+            rotation_action_list = self.computeRotationActions(end_direction, )
+            actions.extend(rotation_action_list)
+
+    def computeRotationActions(self, start_dir, end_dir, base_angle=15):
+        ang_diff0 = (start_dir - end_dir) % 360
+        ang_diff360 = (360 - (start_dir - end_dir)) % 360
+        if abs(ang_diff360) >= base_angle and abs(ang_diff0) >= base_angle:
+            if ang_diff0 < ang_diff360:
+                times = ang_diff0 // base_angle
+                return ['turn left'] * times
+            else:
+                times = ang_diff360 // base_angle
+                return ['turn right'] * times
+        return []
 
 class GraphTraverser():
     def __init__(self, graph: Graph, start_node=1, base_turn_angle=15, plotImgs=False, recordActions=False, distance_reward = True, human=False):
@@ -114,15 +169,19 @@ class GraphTraverser():
         self.action_space = 4
         self.distance_reward = distance_reward
         self.human = human #whether the traversal is by a human (true) or an RL agent (false)
-        self.reset()
+        self.current_node = self.start_node
+        self.current_direction = 180
+        if self.recordActions:
+            self.path = [self.current_node]
+            self.actions = []
 
     def reset(self):
         self.current_node = self.start_node
         self.current_direction = 180
-        self.setGoalNode()
         if self.recordActions:
             self.path = [self.current_node]
             self.actions = []
+        time.sleep(0.5)
 
     def randomInit(self):
         self.current_node = random.choice(range(1,self.graph.config['num_vertices']+1))
@@ -131,6 +190,7 @@ class GraphTraverser():
         if self.recordActions:
             self.path = [self.current_node]
             self.actions = []
+        time.sleep(0.5)
 
     def setGoalNode(self, goal=None, direction=None):
         if goal is None:
@@ -148,10 +208,13 @@ class GraphTraverser():
             choice = random.choice(first_level_reachable)
             self.goalNode = choice[1]
             self.goalDirection = random.choice(range(0,360,5)) #TODO: expand to all angles maybe?
+            print(self.current_node, self.goalNode, first_level_reachable)
+            time.sleep(0.5)
             #TODO: change distance reward if you go back to the multi step goal
         else:
             self.goalNode = goal
             self.goalDirection=direction
+            time.sleep(0.5)
 
     def step(self, action):
         # returns reward and observation

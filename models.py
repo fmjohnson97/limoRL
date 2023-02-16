@@ -410,7 +410,7 @@ class GoalReplayBuffer():
         self.addSample(sample)
 
 class Encoder2(nn.Module):
-
+    # borrowed from https://uvadlc-notebooks.readthedocs.io/en/latest/tutorial_notebooks/tutorial9/AE_CIFAR10.html
     def __init__(self,
                  num_input_channels : int,
                  base_channel_size : int,
@@ -445,7 +445,7 @@ class Encoder2(nn.Module):
         return self.net(x)
 
 class Decoder2(nn.Module):
-
+    #borrowed from https://uvadlc-notebooks.readthedocs.io/en/latest/tutorial_notebooks/tutorial9/AE_CIFAR10.html
     def __init__(self,
                  num_input_channels : int,
                  base_channel_size : int,

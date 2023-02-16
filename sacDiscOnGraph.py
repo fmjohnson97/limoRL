@@ -44,6 +44,7 @@ def getArgs():
 def train(args, device):
     # initialize the environment and get the first observation
     env = GraphTraverser(Graph(config_path=args.config_file), distance_reward=args.dist_reward)
+    env.randomInit()
     obs = env.getImg()
 
     #TODO: need to make SAC goal conditioned when getting actions!
@@ -106,7 +107,7 @@ def train(args, device):
         action[action_ind] = 1
         # goal info is currently (start node,  star dir, goal node, goal dir)
         # getting the goal images to save instead of the goal info (since that's really for debug purposes tbh)
-        goal_img = env.getImg(goal_info[-2], goal_info[-1])
+        goal_img = env.getGoalImg()
         # sample of the shape (s, a, r, g, s', done)
         replay_buffer.addSample([obs, action, reward, goal_img, obs_new, done])
         # implementing hindsight experience replay
@@ -147,6 +148,7 @@ def train(args, device):
     return model
 
 def test(args, device, model=None):
+    print('testing!')
     env = GraphTraverser(Graph(config_path=args.config_file))
 
     if model is None:
@@ -160,14 +162,52 @@ def test(args, device, model=None):
     step = 0
     total_reward = 0
     actions = []
+    locations = []
     start = [env.current_node, env.current_direction]
     goal = [env.goalNode, env.goalDirection]
-    print('Start: Node',env.current_node,',',env.current_direction,'degrees')
-    print('Goal: Node', env.goalNode, ',', env.goalDirection, 'degrees')
 
+    goal_img = env.getImg()
     while not done and step < args.steps_per_epoch:
-        goal_img = env.getImg()
         action = model.get_action(np.stack([obs]), np.stack([goal_img]))
+        obs_new, reward, goal_info, done = env.step(action)
+
+        actions.append(action)
+        locations.append([env.current_node, env.current_direction])
+        total_reward+=reward
+        step+=1
+
+        obs = obs_new
+
+    print('Start: Node', start[0], ',', start[1], 'degrees')
+    print('Goal: Node', goal[0], ',', goal[1], 'degrees')
+    # print('Actions: 0=straight, 1=backward, 2=left, 3=right')
+    # the actions are bad bc don't actually take action so how know how to update the angles
+    optimal_solution = env.graph.findPath(start_node=start[0], end_node=goal[0], start_direction=start[1], end_direction=goal[1], base_angle=env.base_turn_angle)
+    print('Optimal Solution:')
+    print('path', optimal_solution[0])
+    print('actions', optimal_solution[1])
+    human_actions = []
+    action_key = {0:'forward', 1:'backward', 2:'left', 3:'right'}
+    for act in actions:
+        human_actions.append(action_key[int(act)])
+    print()
+    print('Agent Actions:', list(zip(human_actions, ['to [node,dir]='] * len(locations), locations)))
+    action_diffs = []
+    i=0
+    for act in optimal_solution[1]:
+        if i<len(human_actions):
+            if human_actions[i] not in act:
+                while i<len(human_actions) and human_actions[i] not in act:
+                    action_diffs.append(human_actions[i])
+                    i+=1
+            # elif action_diffs[-1]!='same':
+            else:
+                action_diffs.append('same')
+    for act in human_actions[i:]:
+        action_diffs.append(act)
+        print()
+    print('Extraneous Actions:', action_diffs)
+
 
 
 if __name__ == '__main__':
@@ -177,5 +217,6 @@ if __name__ == '__main__':
     args = getArgs()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    model = train(args, device)
+    # model = train(args, device)
+    test(args, device)#, model)
 
