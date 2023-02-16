@@ -140,7 +140,7 @@ def train(args, device):
         replay_buffer.addSample([obs, action, reward, goal_img, obs_new, done])
         if action_ind in [0,1] and end!=start:
             # putting more copies of the same action into the buffer
-            for _ in range(3):
+            for _ in range(9):
                 replay_buffer.addSample([obs, action, reward, goal_img, obs_new, done])
             # if action is forward, reverse the obs and add as a backwards sample (and vice versa)
             # but not if dist reward=True (bc how compute reward in both cases)
@@ -159,7 +159,7 @@ def train(args, device):
                     if done:
                         done = False
                         reward = -1
-                for _ in range(4):
+                for _ in range(10):
                     replay_buffer.addSample([obs_new, action, reward, goal_img, obs, done])
         # implementing hindsight experience replay
         # replay_buffer.addHERSample([obs, action, reward, goal_img, obs_new, done], args.max_reward)
