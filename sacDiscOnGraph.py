@@ -205,6 +205,7 @@ def test(args, device, model=None):
 
     print('Start: Node', start[0], ',', start[1], 'degrees')
     print('Goal: Node', goal[0], ',', goal[1], 'degrees')
+    print('Total Reward',total_reward)
     # print('Actions: 0=straight, 1=backward, 2=left, 3=right')
     # the actions are bad bc don't actually take action so how know how to update the angles
     optimal_solution = env.graph.findPath(start_node=start[0], end_node=goal[0], start_direction=start[1], end_direction=goal[1], base_angle=env.base_turn_angle)
