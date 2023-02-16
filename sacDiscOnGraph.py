@@ -18,11 +18,13 @@ def getArgs():
     parser.add_argument('--batch_size', type=int, default=32, help='number of samples used to update the networks at once')
     parser.add_argument('--epochs', type=int, default=50000, help='number of epochs for training')
     parser.add_argument('--steps_per_epoch', type=int, default = 20, help='max number of steps for each epoch')
-    parser.add_argument('--use_policy_step', type=int, default=500, help='number of steps before using the learned policy')
+    parser.add_argument('--use_policy_step', type=int, default=200, help='number of steps before using the learned policy')
     parser.add_argument('--lr', type=float, default=1e-5, help='learning rate for training')
     parser.add_argument('--save_name', default='sacDiscOnGraph', help='prefix name for saving the SAC networks')
     parser.add_argument('--target_update_freq', type=int, default=20, help='max number of samples in the replay buffer')
     parser.add_argument('--dist_reward', action='store_true', help='use the distance reward instead')
+    parser.add_argument('--test', action='store_true', help='skip training and just test')
+
 
     # buffer hyperparameters
     parser.add_argument('--buffer_limit', type=int, default=40000, help='max number of samples in the replay buffer')
@@ -68,7 +70,7 @@ def train(args, device):
         # artificially populating the buffer with more samples of the actions taken less often (forward/backward)
         if action_ind in [0,1] and end!=start:
             # putting more copies of the same action into the buffer
-            for _ in range(4):
+            for _ in range(2):
                 replay_buffer.addSample([obs, action, reward, goal_img, obs_new, done])
             # if action is forward, reverse the obs and add as a backwards sample (and vice versa)
             # but not if dist reward=True (bc how compute reward in both cases)
@@ -87,7 +89,7 @@ def train(args, device):
                     if done:
                         done = False
                         reward = -1
-                for _ in range(5):
+                for _ in range(3):
                     replay_buffer.addSample([obs_new, action, reward, goal_img, obs, done])
         # implementing hindsight experience replay
         # replay_buffer.addHERSample([obs, action, reward, goal_img, obs_new, done], args.max_reward)
@@ -215,21 +217,21 @@ def test(args, device, model=None):
         human_actions.append(action_key[int(act)])
     print()
     print('Agent Actions:', list(zip(human_actions, ['to [node,dir]='] * len(locations), locations)))
-    action_diffs = []
-    i=0
-    for act in optimal_solution[1]:
-        if i<len(human_actions):
-            if human_actions[i] not in act:
-                while i<len(human_actions) and human_actions[i] not in act:
-                    action_diffs.append(human_actions[i])
-                    i+=1
-            # elif action_diffs[-1]!='same':
-            else:
-                action_diffs.append('same')
-    for act in human_actions[i:]:
-        action_diffs.append(act)
-        print()
-    print('Extraneous Actions:', action_diffs)
+    # action_diffs = []
+    # i=0
+    # for act in optimal_solution[1]:
+    #     if i<len(human_actions):
+    #         if human_actions[i] not in act:
+    #             while i<len(human_actions) and human_actions[i] not in act:
+    #                 action_diffs.append(human_actions[i])
+    #                 i+=1
+    #         # elif action_diffs[-1]!='same':
+    #         else:
+    #             action_diffs.append('same')
+    # for act in human_actions[i:]:
+    #     action_diffs.append(act)
+    #     print()
+    # print('Extraneous Actions:', action_diffs)
 
 
 
@@ -240,6 +242,7 @@ if __name__ == '__main__':
     args = getArgs()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    model = train(args, device)
-    test(args, device, model)
+    if not args.test:
+        model = train(args, device)
+    test(args, device)#, model)
 
