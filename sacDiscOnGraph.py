@@ -124,7 +124,7 @@ def train(args, device):
         # initial random action or use the learned policy
         rand_num = random.random()
         # last part is epsilon greedy
-        if step < args.use_policy_step or rand_num < math.exp(-1. * step / 900):
+        if step < args.use_policy_step or rand_num < math.exp(-1. * step / 1000):
             action = random.choice(range(env.action_space))
         else:
             goal_img = env.getGoalImg()
