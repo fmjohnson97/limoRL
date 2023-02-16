@@ -300,7 +300,7 @@ class GraphTraverser():
         return -1
 
     def moveForward(self):
-        nodeOptions = self.graph.getReachableVertices(self.current_node, self.current_direction)
+        nodeOptions = self.graph.getReachableVertices(self.current_node, self.current_direction, angle_threshold=self.base_turn_angle*2)
         if len(nodeOptions)==0:
             if self.recordActions:
                 # update rule is start node, end node, amount moved forward, angle turned
@@ -327,7 +327,7 @@ class GraphTraverser():
 
     def moveBack(self):
         backwardsDirection = (self.current_direction+180) % 360
-        nodeOptions = self.graph.getReachableVertices(self.current_node, backwardsDirection)
+        nodeOptions = self.graph.getReachableVertices(self.current_node, backwardsDirection, angle_threshold=self.base_turn_angle*2)
         if len(nodeOptions) == 0:
             if self.recordActions:
                 # update rule is start node, end node, amount moved forward, angle turned
