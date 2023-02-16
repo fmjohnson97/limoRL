@@ -25,8 +25,8 @@ def getArgs():
     parser.add_argument('--dist_reward', action='store_true', help='use the distance reward instead')
 
     # buffer hyperparameters
-    parser.add_argument('--buffer_limit', type=int, default=400000, help='max number of samples in the replay buffer')
-    parser.add_argument('--buffer_init_steps', type=int, default=3000, help='number of random actions to take before train loop')
+    parser.add_argument('--buffer_limit', type=int, default=40000, help='max number of samples in the replay buffer')
+    parser.add_argument('--buffer_init_steps', type=int, default=4000, help='number of random actions to take before train loop')
     parser.add_argument('--max_reward', type=float, default=1, help='max reward achievable by agent when reaches goal')
 
     # sac hyperparameters
@@ -53,16 +53,42 @@ def train(args, device):
     replay_buffer = GoalReplayBuffer(args)
     for step in range(args.buffer_init_steps):
         action = random.choice(range(env.action_space))
+        start = env.current_node
         obs_new, reward, goal_info, done = env.step(action)
         # transforming action to store it as a vector
         action_ind = action
         action = np.zeros(env.action_space)
         action[action_ind] = 1
+        end = env.current_node
         # goal info is currently (start node,  star dir, goal node, goal dir)
         # getting the goal images to save instead of the goal info (since that's really for debug purposes tbh)
         goal_img = env.getGoalImg()
         # sample of the shape (s, a, r, g, s', done)
         replay_buffer.addSample([obs, action, reward, goal_img, obs_new, done])
+        # artificially populating the buffer with more samples of the actions taken less often (forward/backward)
+        if action_ind in [0,1] and end!=start:
+            # putting more copies of the same action into the buffer
+            for _ in range(4):
+                replay_buffer.addSample([obs, action, reward, goal_img, obs_new, done])
+            # if action is forward, reverse the obs and add as a backwards sample (and vice versa)
+            # but not if dist reward=True (bc how compute reward in both cases)
+            # but can do if dist reward = False
+            if not args.dist_reward:
+                # breakpoint()
+                if action_ind==0:
+                    action[0]=0
+                    action[1]=1
+                    if done:
+                        done = False
+                        reward = -1
+                elif action_ind==1:
+                    action[0] = 1
+                    action[1] = 0
+                    if done:
+                        done = False
+                        reward = -1
+                for _ in range(5):
+                    replay_buffer.addSample([obs_new, action, reward, goal_img, obs, done])
         # implementing hindsight experience replay
         # replay_buffer.addHERSample([obs, action, reward, goal_img, obs_new, done], args.max_reward)
         if reward == 1 or step % args.steps_per_epoch==0:
@@ -136,11 +162,8 @@ def train(args, device):
         else:
             obs = obs_new
 
-        # update model
-        # TODO: should we use this as a positive and negative example like Hindsight Experience Replay???
-
-        # sample the buffer, do the q and policy updates, update trackers
-        sample = replay_buffer.sample()  # (s, a, r, s', done)
+        # update model: sample the buffer, do the q and policy updates, update trackers
+        sample = replay_buffer.sample()  # (s, a, r, g, s', done)
         qloss, policyloss = model.update(sample, step % args.target_update_freq == 0)
         total_qloss += qloss
         total_policyloss += policyloss
