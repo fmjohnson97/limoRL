@@ -1,5 +1,6 @@
 import random
 import torch
+import math
 import argparse
 import numpy as np
 
@@ -24,6 +25,8 @@ def getArgs():
     parser.add_argument('--target_update_freq', type=int, default=20, help='max number of samples in the replay buffer')
     parser.add_argument('--dist_reward', action='store_true', help='use the distance reward instead')
     parser.add_argument('--test', action='store_true', help='skip training and just test')
+    parser.add_argument('--epsilon', type=float, default=0.3, help='learning rate for training')
+
 
 
     # buffer hyperparameters
@@ -119,7 +122,9 @@ def train(args, device):
     obs = env.getImg()
     for step in range(args.epochs*args.steps_per_epoch):
         # initial random action or use the learned policy
-        if step < args.use_policy_step:
+        rand_num = random.random()
+        # last part is epsilon greedy
+        if step < args.use_policy_step or rand_num < math.exp(-1. * step / 900):
             action = random.choice(range(env.action_space))
         else:
             goal_img = env.getGoalImg()
