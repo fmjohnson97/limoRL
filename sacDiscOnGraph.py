@@ -21,7 +21,7 @@ def getArgs():
     parser.add_argument('--use_policy_step', type=int, default=500, help='number of steps before using the learned policy')
     parser.add_argument('--lr', type=float, default=1e-5, help='learning rate for training')
     parser.add_argument('--save_name', default='sacDiscOnGraph', help='prefix name for saving the SAC networks')
-    parser.add_argument('--target_update_freq', type=int, default=10, help='max number of samples in the replay buffer')
+    parser.add_argument('--target_update_freq', type=int, default=20, help='max number of samples in the replay buffer')
     parser.add_argument('--dist_reward', action='store_true', help='use the distance reward instead')
 
     # buffer hyperparameters
@@ -217,6 +217,6 @@ if __name__ == '__main__':
     args = getArgs()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    # model = train(args, device)
-    test(args, device)#, model)
+    model = train(args, device)
+    test(args, device, model)
 
