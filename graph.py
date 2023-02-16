@@ -208,7 +208,7 @@ class GraphTraverser():
             choice = random.choice(first_level_reachable)
             self.goalNode = choice[1]
             self.goalDirection = random.choice(range(0,360,5)) #TODO: expand to all angles maybe?
-            print(self.current_node, self.goalNode, first_level_reachable)
+            # print(self.current_node, self.goalNode, first_level_reachable)
             time.sleep(0.5)
             #TODO: change distance reward if you go back to the multi step goal
         else:
