@@ -250,7 +250,14 @@ class GraphTraverser():
             #TODO: add angle to reward if that comes back up
             node1pos=self.graph.config['positions'][str(self.current_node)]
             node2pos = self.graph.config['positions'][str(self.goalNode)]
-            return -((node2pos[0]-node1pos[0])**2+(node2pos[1]-node1pos[1])**2)**0.5
+            # breakpoint()
+            # goal_vec = self.getGoalVector()
+            landmark_pos = self.graph.config['landmarks']
+            # return -((node2pos[0]-node1pos[0])**2+(node2pos[1]-node1pos[1])**2)**0.5
+            # return - np.dot(node1pos, node2pos)/10 #???
+            if abs(np.sum(np.dot(landmark_pos, node2pos) - np.dot(landmark_pos, node1pos)))/10 >10:
+                breakpoint()
+            return -abs(np.sum(np.dot(landmark_pos, node2pos) - np.dot(landmark_pos, node1pos)))/10
         else:
             return reward#/10
 
@@ -372,8 +379,9 @@ class GraphTraverser():
         return self.getImg(self.goalNode,self.goalDirection)
 
     def getGoalVector(self):
-        landmark_pos = self.graph.config['landmarks']
-        return np.array(landmark_pos)-self.graph.config['positions'][str(self.current_node)]
+        return None
+        # landmark_pos = self.graph.config['landmarks']
+        # return np.array(landmark_pos)-self.graph.config['positions'][str(self.current_node)]
 
     def render(self):
         image = self.getImg()
