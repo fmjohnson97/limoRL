@@ -171,6 +171,7 @@ class GraphTraverser():
         self.human = human #whether the traversal is by a human (true) or an RL agent (false)
         self.current_node = self.start_node
         self.current_direction = 180
+        self.fig, self.ax = plt.subplots(1,1)
         if self.recordActions:
             self.path = [self.current_node]
             self.actions = []
@@ -371,10 +372,11 @@ class GraphTraverser():
         return self.getImg(self.goalNode,self.goalDirection)
 
     def render(self):
-        #TODO: keep track of the figure so the slowdown stops happening
         image = self.getImg()
-        plt.imshow(image)
-        plt.title('Node: '+str(self.current_node)+', Heading: '+str(self.current_direction))
+        # plt.imshow(image)
+        # plt.title('Node: '+str(self.current_node)+', Heading: '+str(self.current_direction))
+        self.ax.imshow(image)
+        self.ax.set_title('Node: '+str(self.current_node)+', Heading: '+str(self.current_direction))
         plt.pause(0.01)
 
     def traverse(self):
