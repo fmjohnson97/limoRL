@@ -30,7 +30,7 @@ def getArgs():
 
 
     # buffer hyperparameters
-    parser.add_argument('--buffer_limit', type=int, default=40000, help='max number of samples in the replay buffer')
+    parser.add_argument('--buffer_limit', type=int, default=50000, help='max number of samples in the replay buffer')
     parser.add_argument('--buffer_init_steps', type=int, default=4000, help='number of random actions to take before train loop')
     parser.add_argument('--max_reward', type=float, default=1, help='max reward achievable by agent when reaches goal')
 
