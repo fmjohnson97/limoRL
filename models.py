@@ -102,7 +102,7 @@ class SACDiscreteBaseline(nn.Module):
         self.backbone=backbone
         # initialize networks
         # note: all using a shared feature extractor which isn't getting any loss backprop-ed
-        feat_dim= 512 * 7 * 7 * 2 #*2 is for goal # cnn 4096# fc 2048 # resnet 512 * 7 * 7
+        feat_dim= 512 * 7 * 7 * 2 + 2*3 #*2 is for goal # cnn 4096# fc 2048 # resnet 512 * 7 * 7
         # self.img_fc = Linear(96*96*3,feat_dim).to(device)
         # self.img_fc = nn.Sequential(Conv2d(3, 32, kernel_size=8, stride=4, padding=0), ReLU(),
         #                             Conv2d(32, 64, kernel_size=4, stride=2, padding=0), ReLU(),
@@ -144,11 +144,13 @@ class SACDiscreteBaseline(nn.Module):
         print('Initialized SAC Baseline with',self.total_params,'parameters!\n')
 
     @torch.no_grad()
-    def get_action(self, observation, goal_obs):
+    def get_action(self, observation, goal_obs, goal_vec=None):
         # breakpoint()
         img_feats = self.backbone.extractFeatures(observation)
         goal_feats = self.backbone.extractFeatures(goal_obs)
         img_feats = torch.cat((img_feats,goal_feats), axis=-1)
+        if goal_vec is not None:
+            img_feats = torch.cat((img_feats,torch.FloatTensor(goal_vec.reshape(len(img_feats), -1))), axis=-1)
         action_dist, action, log_action = self.policyNetwork(img_feats)
         # breakpoint()
         action = action.argmax(-1)
@@ -157,11 +159,15 @@ class SACDiscreteBaseline(nn.Module):
     @torch.no_grad()
     def computeQTargets(self, sample):
         # breakpoint()
-        # (s, a, r, g, s', done)
-        observation, action, reward, goal_imgs, observation_new, done = sample
+        # (s, a, r, g, s', g', done)
+        # observation, action, reward, goal_imgs, observation_new, done = sample
+        observation, action, reward, goal, observation_new, goal_new, done = sample
+        goal_imgs_new, goal_vec_new = np.stack(goal_new[:,0]), np.stack(goal_new[:,1])
         img_new_feats = self.backbone.extractFeatures(observation_new) #self.prelu(self.img_fc(observation_new)) #
-        goal_feats = self.backbone.extractFeatures(goal_imgs)
-        img_new_feats = torch.cat((img_new_feats, goal_feats), axis=-1)
+        goal_feats_new = self.backbone.extractFeatures(goal_imgs_new)
+        img_new_feats = torch.cat((img_new_feats, goal_feats_new), axis=-1)
+        if goal_vec_new is not None:
+            img_new_feats = torch.cat((img_new_feats,torch.FloatTensor(goal_vec_new.reshape(len(img_new_feats), -1))), axis=-1)
         # print('imgnew',img_new_feats.mean())
         #get the target action from the current policy
         action_dist_new, action_new, log_action_new = self.policyNetwork(img_new_feats)
@@ -175,16 +181,16 @@ class SACDiscreteBaseline(nn.Module):
         q_target = q_target.reshape(len(q_target),-1).to(self.device)
         return q_target
 
-        # this was for computing the policy loss
-        #self.pi_loss_func(q_value, self.alpha * log_action)  #(q_value - self.alpha * log_pi_action).mean() # they use L1 loss for some reason???
-
     def update(self, sample, updateTargets=True):
         # breakpoint()
-        observation, action, reward, goal_imgs, observation_new, done = sample
-        # print(goal_info)
+        # observation, action, reward, goal_imgs, observation_new, done = sample
+        observation, action, reward, goal, observation_new, goal_new, done = sample
+        goal_imgs, goal_vec = np.stack(goal[:,0]), np.stack(goal[:,1])
         img_feats = self.backbone.extractFeatures(observation) #self.prelu(self.img_fc(observation)) #
         goal_feats = self.backbone.extractFeatures(goal_imgs)
         img_feats = torch.cat((img_feats,goal_feats), axis=-1)
+        if goal_vec is not None:
+            img_feats = torch.cat((img_feats,torch.FloatTensor(goal_vec.reshape(len(img_feats), -1))), axis=-1)
         action = torch.FloatTensor(action)#.reshape(-1,1)
         action = action.to(self.device)
 
@@ -379,6 +385,7 @@ class GoalReplayBuffer():
         r=[]
         g=[]
         sprime=[]
+        gprime=[]
         done=[]
         for i in range(batch_size):
             ind=random.randint(0,len(self.buffer)-1)
@@ -388,11 +395,12 @@ class GoalReplayBuffer():
             r.append(temp[2])
             g.append(temp[3])
             sprime.append(temp[4])
-            done.append(temp[5])
+            gprime.append(temp[5])
+            done.append(temp[6])
         try:
-            return [np.stack(s), np.stack(a), np.stack(r), np.stack(g), np.stack(sprime), np.stack(done)]
+            return [np.stack(s), np.stack(a), np.stack(r), np.stack(g), np.stack(sprime), np.stack(gprime), np.stack(done)]
         except Exception as e:
-            print(e)
+            print('Error:',e)
             breakpoint()
 
     def addSample(self, sample):
@@ -403,10 +411,10 @@ class GoalReplayBuffer():
 
     # Hindsight Experience Replay
     def addHERSample(self, sample, new_reward):
-        # sample of the form s, a, r, g, s', done
+        # sample of the form s, a, r, g, s', g', done
         sample[3] = sample[4]  # replace old goal with next state (as if trying to get there the whole time)
         sample[2] = new_reward  # replace old reward with success reward (bc achieved the goal)
-        sample[5] = True  # changing done to True because goal reached
+        sample[-1] = True  # changing done to True because goal reached
         self.addSample(sample)
 
 class Encoder2(nn.Module):

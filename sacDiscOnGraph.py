@@ -57,17 +57,21 @@ def train(args, device):
     # initialize and populate the replay buffer
     replay_buffer = GoalReplayBuffer(args)
     for step in range(args.buffer_init_steps):
+        # breakpoint()
         action = random.choice(range(env.action_space))
+        # goal info is currently (start node,  star dir, goal node, goal dir)
+        # getting the goal images to save instead of the goal info (since that's really for debug purposes tbh)
+        goal_img = env.getGoalImg()
+        goal_vec = env.getGoalVector()
         obs_new, reward, goal_info, done = env.step(action)
         # transforming action to store it as a vector
         action_ind = action
         action = np.zeros(env.action_space)
         action[action_ind] = 1
-        # goal info is currently (start node,  star dir, goal node, goal dir)
-        # getting the goal images to save instead of the goal info (since that's really for debug purposes tbh)
-        goal_img = env.getGoalImg()
-        # sample of the shape (s, a, r, g, s', done)
-        replay_buffer.addSample([obs, action, reward, goal_img, obs_new, done])
+        goal_img_new = env.getGoalImg()
+        goal_vec_new = env.getGoalVector()
+        # sample of the shape (s, a, r, g, s', g', done)
+        replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
         # implementing hindsight experience replay
         # replay_buffer.addHERSample([obs, action, reward, goal_img, obs_new, done], args.max_reward)
         if reward == 1 or step % args.steps_per_epoch==0:
@@ -100,9 +104,14 @@ def train(args, device):
         # last part is epsilon greedy
         if step < args.use_policy_step or rand_num < math.exp(-1. * step / 1000):
             action = random.choice(range(env.action_space))
+            # goal info is currently (start node,  star dir, goal node, goal dir)
+            # getting the goal images to save instead of the goal info (since that's really for debug purposes tbh)
+            goal_img = env.getGoalImg()
+            goal_vec = env.getGoalVector()
         else:
             goal_img = env.getGoalImg()
-            action = model.get_action(np.stack([obs]), np.stack([goal_img]))
+            goal_vec = env.getGoalVector()
+            action = model.get_action(np.stack([obs]), np.stack([goal_img]), np.stack([goal_vec]))
 
         # take action in the environment and save to replay/update trackers
         # if step > args.use_policy_step:
@@ -112,11 +121,10 @@ def train(args, device):
         action_ind = action
         action = np.zeros(env.action_space)
         action[action_ind] = 1
-        # goal info is currently (start node,  star dir, goal node, goal dir)
-        # getting the goal images to save instead of the goal info (since that's really for debug purposes tbh)
-        goal_img = env.getGoalImg()
+        goal_img_new = env.getGoalImg()
+        goal_vec_new = env.getGoalVector()
         # sample of the shape (s, a, r, g, s', done)
-        replay_buffer.addSample([obs, action, reward, goal_img, obs_new, done])
+        replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new,goal_vec_new), done])
         # implementing hindsight experience replay
         # replay_buffer.addHERSample([obs, action, reward, goal_img, obs_new, done], args.max_reward)
         # if step>args.use_policy_step:
@@ -144,7 +152,7 @@ def train(args, device):
             obs = obs_new
 
         # update model: sample the buffer, do the q and policy updates, update trackers
-        sample = replay_buffer.sample()  # (s, a, r, g, s', done)
+        sample = replay_buffer.sample()  # (s, a, r, g, s', g', done)
         qloss, policyloss = model.update(sample, step % args.target_update_freq == 0)
         total_qloss += qloss
         total_policyloss += policyloss

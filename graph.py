@@ -371,6 +371,10 @@ class GraphTraverser():
     def getGoalImg(self):
         return self.getImg(self.goalNode,self.goalDirection)
 
+    def getGoalVector(self):
+        landmark_pos = self.graph.config['landmarks']
+        return np.array(landmark_pos)-self.graph.config['positions'][str(self.current_node)]
+
     def render(self):
         image = self.getImg()
         # plt.imshow(image)
