@@ -149,7 +149,7 @@ class SACDiscreteBaseline(nn.Module):
         img_feats = self.backbone.extractFeatures(observation)
         goal_feats = self.backbone.extractFeatures(goal_obs)
         img_feats = torch.cat((img_feats,goal_feats), axis=-1)
-        if sum(goal_vec==None)==0:
+        if goal_vec is not None and sum(goal_vec==None)==0:
             img_feats = torch.cat((img_feats,torch.FloatTensor(goal_vec.reshape(len(img_feats), -1)).to(self.device)), axis=-1)
         action_dist, action, log_action = self.policyNetwork(img_feats)
         # breakpoint()
@@ -166,7 +166,7 @@ class SACDiscreteBaseline(nn.Module):
         img_new_feats = self.backbone.extractFeatures(observation_new) #self.prelu(self.img_fc(observation_new)) #
         goal_feats_new = self.backbone.extractFeatures(goal_imgs_new)
         img_new_feats = torch.cat((img_new_feats, goal_feats_new), axis=-1)
-        if sum(goal_vec_new==None)==0:
+        if goal_vec_new is not None and sum(goal_vec_new==None)==0:
             img_new_feats = torch.cat((img_new_feats,torch.FloatTensor(goal_vec_new.reshape(len(img_new_feats), -1)).to(self.device)), axis=-1)
         # print('imgnew',img_new_feats.mean())
         #get the target action from the current policy
@@ -189,7 +189,7 @@ class SACDiscreteBaseline(nn.Module):
         img_feats = self.backbone.extractFeatures(observation) #self.prelu(self.img_fc(observation)) #
         goal_feats = self.backbone.extractFeatures(goal_imgs)
         img_feats = torch.cat((img_feats,goal_feats), axis=-1)
-        if sum(goal_vec==None)==0:
+        if goal_vec is not None and sum(goal_vec==None)==0:
             img_feats = torch.cat((img_feats,torch.FloatTensor(goal_vec.reshape(len(img_feats), -1)).to(self.device)), axis=-1)
         action = torch.FloatTensor(action)#.reshape(-1,1)
         action = action.to(self.device)
