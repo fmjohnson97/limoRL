@@ -182,7 +182,7 @@ class GraphTraverser():
         if self.recordActions:
             self.path = [self.current_node]
             self.actions = []
-        time.sleep(0.5)
+        # time.sleep(0.5)
 
     def randomInit(self):
         self.current_node = random.choice(range(1,self.graph.config['num_vertices']+1))
@@ -191,7 +191,7 @@ class GraphTraverser():
         if self.recordActions:
             self.path = [self.current_node]
             self.actions = []
-        time.sleep(0.5)
+        # time.sleep(0.5)
 
     def setGoalNode(self, goal=None, direction=None):
         if goal is None:
@@ -210,12 +210,12 @@ class GraphTraverser():
             self.goalNode = choice[1]
             self.goalDirection = random.choice(range(0,360,15)) #TODO: expand to all angles maybe?
             # print(self.current_node, self.goalNode, first_level_reachable)
-            time.sleep(0.5)
+            # time.sleep(0.5)
             #TODO: change distance reward if you go back to the multi step goal
         else:
             self.goalNode = goal
             self.goalDirection=direction
-            time.sleep(0.5)
+            # time.sleep(0.5)
 
     def step(self, action):
         # returns reward and observation
