@@ -246,22 +246,21 @@ class GraphTraverser():
     def checkGoal(self, reward):
         node1pos = self.graph.config['positions'][str(self.current_node)]
         node2pos = self.graph.config['positions'][str(self.goalNode)]
-        landmark_pos = self.graph.config['landmarks']
-        if self.current_node == self.goalNode and abs(self.current_direction-self.goalDirection)<self.base_turn_angle*2:
+        landmark_pos = np.array(self.graph.config['landmarks'])
+        if self.current_node == self.goalNode: # and abs(self.current_direction-self.goalDirection)<self.base_turn_angle*2:
             #TODO: make this back to base angle (not *2)
-            # return 1
-            return abs(np.sum(np.dot(landmark_pos, node1pos)))/10
+            return 1
+            # return abs(np.sum(np.dot(landmark_pos, node1pos)))/10
         elif self.distance_reward:
-            #TODO: add angle to reward if that comes back up
             node1pos=self.graph.config['positions'][str(self.current_node)]
             node2pos = self.graph.config['positions'][str(self.goalNode)]
-            # breakpoint()
             # goal_vec = self.getGoalVector()
             # return -((node2pos[0]-node1pos[0])**2+(node2pos[1]-node1pos[1])**2)**0.5
             # return - np.dot(node1pos, node2pos)/10 #???
             # if abs(np.sum(np.dot(landmark_pos, node2pos) - np.dot(landmark_pos, node1pos)))/10 >10:
             #     breakpoint()
-            return -abs(np.sum(np.dot(landmark_pos, node2pos) - np.dot(landmark_pos, node1pos)))/10-abs(self.current_direction-self.goalDirection)/100
+            # return -abs(np.sum(np.dot(landmark_pos, node2pos) - np.dot(landmark_pos, node1pos)))/10#-abs(self.current_direction-self.goalDirection)/100
+            return np.mean(-abs((landmark_pos - node2pos) - (landmark_pos - node1pos)))
         else:
             return reward#/10
 
@@ -382,10 +381,16 @@ class GraphTraverser():
     def getGoalImg(self):
         return self.getImg(self.goalNode,self.goalDirection)
 
-    def getGoalVector(self):
-        return None
-        # landmark_pos = self.graph.config['landmarks']
-        # return np.array(landmark_pos)-self.graph.config['positions'][str(self.current_node)]
+    def getLandmarkVector(self, node=None):
+        #TODO: normalize??? distances
+        #TODO: get rid of sign(directionality) or implement properly?
+        landmark_pos = np.array(self.graph.config['landmarks'])
+        if node is None:
+            return landmark_pos-self.graph.config['positions'][str(self.current_node)]
+        elif node=='goal':
+            return landmark_pos - self.graph.config['positions'][str(self.goalNode)]
+        else:
+            return landmark_pos - self.graph.config['positions'][str(node)]
 
     def render(self):
         image = self.getImg()

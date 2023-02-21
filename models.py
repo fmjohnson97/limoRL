@@ -276,18 +276,192 @@ class SACDiscreteBaseline(nn.Module):
         for param in self.targetQ2.parameters():
             param.requires_grad = False
 
+class SimpleSACDisc(nn.Module):
+    def __init__(self, args, action_dim, device):
+        super(SimpleSACDisc, self).__init__()
+        #TODO: learning schedule
+        #TODO: alpha schedule
+        #TODO: add save flag for networks
+        #TODO: add learned alpha
+
+        self.device = device
+        # initialize networks
+        # note: all using a shared feature extractor which isn't getting any loss backprop-ed
+        feat_dim= args.feat_dim
+        # self.img_fc = Linear(96*96*3,feat_dim).to(device)
+        # self.img_fc = nn.Sequential(Conv2d(3, 32, kernel_size=8, stride=4, padding=0), ReLU(),
+        #                             Conv2d(32, 64, kernel_size=4, stride=2, padding=0), ReLU(),
+        #                             Conv2d(64, 64, kernel_size=3, stride=1, padding=0), Flatten()).to(device)
+        # self.prelu = PReLU().to(device)
+        self.q1network = QNetwork(feat_dim, action_dim, args.factor).to(device)
+        self.targetQ1 = deepcopy(self.q1network)
+        # self.targetQ1 = self.targetQ1.to(device)
+        self.q2network = QNetwork(feat_dim, action_dim, args.factor).to(device)
+        self.targetQ2 = deepcopy(self.q2network)
+        # self.targetQ2 = self.targetQ2.to(device)
+        self.policyNetwork = PolicyNetwork(args, feat_dim, action_dim, args.factor).to(device)
+
+        # gathering hyperparameters
+        self.gamma = args.gamma
+        self.alpha = args.alpha
+        self.polyak = args.polyak
+
+        #freeze target weights bc only updating with polyak averaging
+        for param in self.targetQ1.parameters():
+            param.requires_grad = False
+        for param in self.targetQ2.parameters():
+            param.requires_grad = False
+
+        #initialized optimizers
+        self.policy_opt = optim.Adam(self.policyNetwork.parameters(), lr=args.lr)
+        self.q1_opt = optim.Adam(self.q1network.parameters(), lr=args.lr)
+        self.q2_opt = optim.Adam(self.q2network.parameters(), lr=args.lr)
+        # self.q_opt = optim.Adam(itertools.chain(self.q1network.parameters(), self.q2network.parameters()), lr=args.lr)
+
+        #init loss function
+        self.q_loss_func=nn.MSELoss()
+        self.pi_loss_func = nn.L1Loss()
+
+        #print stats
+        self.total_params = sum(p.numel() for p in self.q1network.parameters() if p.requires_grad)
+        self.total_params += sum(p.numel() for p in self.q2network.parameters() if p.requires_grad)
+        self.total_params += sum(p.numel() for p in self.policyNetwork.parameters() if p.requires_grad)
+        print('Initialized Simple SAC Baseline with',self.total_params,'parameters!\n')
+
+    @torch.no_grad()
+    def get_action(self, observation, goal_vec):
+        # breakpoint()
+        in_feats = np.concatenate((observation, goal_vec), axis=-1).reshape(len(observation), -1)
+        in_feats = torch.FloatTensor(in_feats).to(self.device)
+        action_dist, action, log_action = self.policyNetwork(in_feats)
+        action = action.argmax(-1)
+        return action.squeeze().cpu().numpy()
+
+    @torch.no_grad()
+    def computeQTargets(self, sample):
+        # breakpoint()
+        # (s, a, r, g, s', g', done)
+        # observation, action, reward, goal_imgs, observation_new, done = sample
+        observation, action, reward, goal, observation_new, goal_new, done = sample
+        goal_imgs_new, goal_vec_new = np.stack(goal_new[:,0]), np.stack(goal_new[:,1])
+        in_feats_new = np.concatenate((observation_new, goal_vec_new), axis=-1).reshape(len(observation_new), -1)
+        in_feats_new = torch.FloatTensor(in_feats_new).to(self.device)
+        #get the target action from the current policy
+        action_dist_new, action_new, log_action_new = self.policyNetwork(in_feats_new)
+
+        #get target q values
+        targetq1_out = self.targetQ1(in_feats_new, action_new)
+        targetq2_out = self.targetQ2(in_feats_new, action_new)
+        q_targ_out = torch.min(targetq1_out, targetq2_out)
+
+        q_target = torch.FloatTensor(reward + self.gamma * (1-done) * np.sum((q_targ_out.cpu().numpy() - self.alpha * log_action_new.cpu().numpy())*action_new.cpu().numpy(), axis=-1))
+        q_target = q_target.reshape(len(q_target),-1).to(self.device)
+        return q_target
+
+    def update(self, sample, updateTargets=True):
+        # breakpoint()
+        # observation, action, reward, goal_imgs, observation_new, done = sample
+        observation, action, reward, goal, observation_new, goal_new, done = sample
+        goal_imgs, goal_vec = np.stack(goal[:,0]), np.stack(goal[:,1])
+        in_feats = np.concatenate((observation, goal_vec), axis=-1).reshape(len(observation),-1)
+        in_feats = torch.FloatTensor(in_feats).to(self.device)
+        action = torch.FloatTensor(action)#.reshape(-1,1)
+        action = action.to(self.device)
+
+        # compute q networks loss and backprop it
+        self.q1_opt.zero_grad()
+        self.q2_opt.zero_grad()
+        q_target = self.computeQTargets(sample)
+        q1_out = self.q1network(in_feats, action)[torch.where(action==1)].reshape(-1,1) #
+        q2_out = self.q2network(in_feats, action)[torch.where(action==1)].reshape(-1,1) #
+        q1_loss = self.q_loss_func(q1_out, q_target)
+        q2_loss = self.q_loss_func(q2_out, q_target)
+        # q1_loss = torch.clamp(q1_loss, -1, 1)
+        # q2_loss = torch.clamp(q2_loss, -1, 1)
+        # q_loss = q1_loss + q2_loss #torch.clamp(q1_loss + q2_loss,-10,10) #TODO: determine how to fix besides reward clipping?
+        # q_loss = torch.min(q1_loss, q2_loss)
+        # q_loss.backward()#retain_graph=True)
+        q1_loss.backward()
+        q2_loss.backward()
+        self.q1_opt.step()
+        self.q2_opt.step()
+
+        # freeze q weights to ease policy network backprop computation
+        # for param in self.q1network.parameters():
+        #     param.requires_grad = False
+        # for param in self.q2network.parameters():
+        #     param.requires_grad = False
+
+        # breakpoint()
+        # compute policy network loss and backprop it
+        self.policy_opt.zero_grad()
+        action_dist, action, log_action = self.policyNetwork(in_feats)
+        with torch.no_grad():
+            q1_policy = self.q1network(in_feats, action)
+            q2_policy = self.q2network(in_feats, action)
+            q_value = torch.min(q1_policy, q2_policy)
+        policy_loss = torch.sum((self.alpha * log_action - q_value) * action, axis=-1).mean()
+        # policy_loss = torch.clamp(policy_loss, -1, 1)
+        # print('losses',q1_loss, q2_loss, q1_loss+q2_loss, policy_loss)
+        policy_loss.backward()
+        self.policy_opt.step()
+
+        # print('q vals + targ', q1_out.mean(),q2_out.mean(), q_target.mean())
+
+        #update target q networks; done before grad turned back on so no loss props to the target networks
+        if updateTargets:
+            with torch.no_grad():
+                for param, targ_param in zip(self.q1network.parameters(), self.targetQ1.parameters()):
+                    targ_param.data.mul_(self.polyak)
+                    targ_param.data.add_((1 - self.polyak) * param.data)
+                for param, targ_param in zip(self.q2network.parameters(), self.targetQ2.parameters()):
+                    targ_param.data.mul_(self.polyak)
+                    targ_param.data.add_((1 - self.polyak) * param.data)
+
+        # turn grad back on for the q networks
+        # for param in self.q1network.parameters():
+        #     param.requires_grad = True
+        # for param in self.q2network.parameters():
+        #     param.requires_grad = True
+
+        # return q_loss.item(), policy_loss.item()
+        return (q1_loss+q2_loss).item(), policy_loss.item()
+
+    def save_models(self,name):
+        if name is None:
+            torch.save(self.q1network.state_dict(), 'baselineOnGraph_q1.pt')
+            torch.save(self.q2network.state_dict(), 'baselineOnGraph_q2.pt')
+            torch.save(self.policyNetwork.state_dict(), 'baselineOnGraph_policy.pt')
+        else:
+            torch.save(self.q1network.state_dict(), name+'_q1.pt')
+            torch.save(self.q2network.state_dict(), name+'_q2.pt')
+            torch.save(self.policyNetwork.state_dict(), name+'_policy.pt')
+
+    def load_states(self, args):
+        self.policyNetwork.load_state_dict(torch.load(args.save_name + '_policy.pt', map_location=torch.device('cpu')))
+        self.q1network.load_state_dict(torch.load(args.save_name + '_q1.pt', map_location=torch.device('cpu')))
+        self.targetQ1 = deepcopy(self.q1network)
+        self.q1network.load_state_dict(torch.load(args.save_name + '_q2.pt', map_location=torch.device('cpu')))
+        self.targetQ2 = deepcopy(self.q2network)
+
+        # freeze target weights bc only updating with polyak averaging
+        for param in self.targetQ1.parameters():
+            param.requires_grad = False
+        for param in self.targetQ2.parameters():
+            param.requires_grad = False
+
 
 class QNetwork(nn.Module):
-    def __init__(self, feat_dim, action_dim):
+    def __init__(self, feat_dim, action_dim, factor=256):
         super(QNetwork, self).__init__()
         #pretrained feature extractor
         # self.fc1=Linear(feat_dim + action_dim,feat_dim // 8)
         # self.fc2 = Linear(feat_dim // 8, feat_dim // 64)
         # self.fc3 = Linear(feat_dim // 64, action_dim)
 
-        self.fc1 = Linear(feat_dim + action_dim, feat_dim // 256)
-        self.fc2 = Linear(feat_dim // 256, feat_dim // 256)
-        self.fc3 = Linear(feat_dim // 256, action_dim)
+        self.fc1 = Linear(feat_dim + action_dim, feat_dim // factor)
+        self.fc2 = Linear(feat_dim // factor, feat_dim // factor)
+        self.fc3 = Linear(feat_dim // factor, action_dim)
 
         # self.fc1=Linear(feat_dim + action_dim,feat_dim)
         # self.fc2 = Linear(feat_dim, action_dim)
@@ -304,15 +478,15 @@ class QNetwork(nn.Module):
         return self.fc3(feats)
 
 class PolicyNetwork(nn.Module):
-    def __init__(self, args, feat_dim, action_dim):
+    def __init__(self, args, feat_dim, action_dim, factor=256):
         super(PolicyNetwork, self).__init__()
         # self.fc1 = Linear(feat_dim, feat_dim // 8)
         # self.fc2 = Linear(feat_dim // 8, feat_dim // 64)
         # self.logits = Linear(feat_dim // 64,action_dim)
 
-        self.fc1 = Linear(feat_dim, feat_dim // 256)
-        self.fc2 = Linear(feat_dim // 256, feat_dim // 256)
-        self.logits = Linear(feat_dim // 256, action_dim)
+        self.fc1 = Linear(feat_dim, feat_dim // factor)
+        self.fc2 = Linear(feat_dim // factor, feat_dim // factor)
+        self.logits = Linear(feat_dim // factor, action_dim)
 
         # self.fc1 = Linear(feat_dim , feat_dim )
         # self.fc2 = Linear(feat_dim , action_dim)
