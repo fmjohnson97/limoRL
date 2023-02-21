@@ -73,7 +73,7 @@ def train(args, device):
         goal_vec_new = env.getGoalVector()
         # sample of the shape (s, a, r, g, s', g', done)
         replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
-        if action_ind in [0,1]:
+        if action_ind==0:
             for _ in range(1):
                 replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new,goal_vec_new), done])
         # implementing hindsight experience replay
@@ -129,7 +129,7 @@ def train(args, device):
         goal_vec_new = env.getGoalVector()
         # sample of the shape (s, a, r, g, s', done)
         replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new,goal_vec_new), done])
-        if action_ind in [0,1]:
+        if action_ind==0:
             for _ in range(1):
                 replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new,goal_vec_new), done])
         # implementing hindsight experience replay
@@ -210,7 +210,7 @@ def test(args, device, model=None):
     print('path', optimal_solution[0])
     print('actions', optimal_solution[1])
     human_actions = []
-    action_key = {0:'forward', 1:'backward', 2:'left', 3:'right'}
+    action_key = {0:'forward', 1:'left', 2:'right'}#3:'backward'
     for act in actions:
         human_actions.append(action_key[int(act)])
     print()

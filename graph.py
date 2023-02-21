@@ -166,7 +166,7 @@ class GraphTraverser():
         self.base_turn_angle = base_turn_angle
         self.plotImgs = plotImgs
         self.recordActions = recordActions
-        self.action_space = 4
+        self.action_space = 3 #4
         self.distance_reward = distance_reward
         self.human = human #whether the traversal is by a human (true) or an RL agent (false)
         self.current_node = self.start_node
@@ -228,14 +228,14 @@ class GraphTraverser():
             reward = self.moveForward()
             reward = self.checkGoal(reward)
         elif action == 1:
-            reward = self.moveBack()
-            reward = self.checkGoal(reward)
-        elif action == 2:
             reward = self.turnLeft()
             reward = self.checkGoal(reward)
-        elif action == 3:
+        elif action == 2:
             reward = self.turnRight()
             reward = self.checkGoal(reward)
+        # elif action == 3:
+        #     reward = self.moveBack()
+        #     reward = self.checkGoal(reward)
         else:
             print(action,"is not a valid action!")
             breakpoint()
