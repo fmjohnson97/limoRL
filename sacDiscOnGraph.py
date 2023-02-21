@@ -25,6 +25,7 @@ def getArgs():
     parser.add_argument('--target_update_freq', type=int, default=20, help='max number of samples in the replay buffer')
     parser.add_argument('--dist_reward', action='store_true', help='use the distance reward instead')
     parser.add_argument('--test', action='store_true', help='skip training and just test')
+    parser.add_argument('--test_freq', type=int, default=10, help='number of epochs between testing')
     parser.add_argument('--epsilon', type=float, default=0.3, help='learning rate for training')
 
 
@@ -162,6 +163,9 @@ def train(args, device):
         qloss, policyloss = model.update(sample, step % args.target_update_freq == 0)
         total_qloss += qloss
         total_policyloss += policyloss
+
+        if step>0 and step % args.steps_per_epoch == 0 and (step // args.steps_per_epoch) % args.test_freq == 0:
+            test(args, device, model)
 
     return model
 
