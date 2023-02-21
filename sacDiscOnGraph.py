@@ -74,7 +74,7 @@ def train(args, device):
         replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
         if action_ind in [0,1]:
             for _ in range(5):
-                replay_buffer.addSample([obs, action, reward, goal_img, obs_new, done])
+                replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new,goal_vec_new), done])
         # implementing hindsight experience replay
         # replay_buffer.addHERSample([obs, action, reward, goal_img, obs_new, done], args.max_reward)
         if reward == 1 or step % args.steps_per_epoch==0:
@@ -130,7 +130,7 @@ def train(args, device):
         replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new,goal_vec_new), done])
         if action_ind in [0,1]:
             for _ in range(5):
-                replay_buffer.addSample([obs, action, reward, goal_img, obs_new, done])
+                replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new,goal_vec_new), done])
         # implementing hindsight experience replay
         # replay_buffer.addHERSample([obs, action, reward, goal_img, obs_new, done], args.max_reward)
         # if step>args.use_policy_step:
