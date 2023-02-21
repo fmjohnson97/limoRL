@@ -165,7 +165,7 @@ def train(args, device):
         total_policyloss += policyloss
 
         if step>0 and step % args.steps_per_epoch == 0 and (step // args.steps_per_epoch) % args.test_freq == 0:
-            test(args, device, model)
+            test_reward = test(args, device, model)
 
     return model
 
@@ -192,6 +192,7 @@ def test(args, device, model=None):
     while not done and step < args.steps_per_epoch:
         action = model.get_action(np.stack([obs]), np.stack([goal_img]))
         obs_new, reward, goal_info, done = env.step(action)
+        print(done)
 
         actions.append(action)
         locations.append([env.current_node, env.current_direction])
@@ -231,6 +232,7 @@ def test(args, device, model=None):
     #     print()
     # print('Extraneous Actions:', action_diffs)
 
+    return total_reward
 
 
 if __name__ == '__main__':

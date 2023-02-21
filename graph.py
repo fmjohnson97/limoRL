@@ -241,7 +241,7 @@ class GraphTraverser():
             breakpoint()
 
         image = self.getImg()
-        return image, reward, (start, start_dir, goal, goal_dir), reward==1
+        return image, reward, (start, start_dir, goal, goal_dir), reward>=1
 
     def checkGoal(self, reward):
         node1pos = self.graph.config['positions'][str(self.current_node)]
@@ -249,6 +249,7 @@ class GraphTraverser():
         landmark_pos = self.graph.config['landmarks']
         if self.current_node == self.goalNode:# and abs(self.current_direction-self.goalDirection)<self.base_turn_angle:
             # return 1
+            breakpoint()
             return abs(np.sum(np.dot(landmark_pos, node1pos)))/10
         elif self.distance_reward:
             #TODO: add angle to reward if that comes back up
