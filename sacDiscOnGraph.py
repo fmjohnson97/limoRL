@@ -74,7 +74,7 @@ def train(args, device):
         # sample of the shape (s, a, r, g, s', g', done)
         replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
         if action_ind in [0,1]:
-            for _ in range(5):
+            for _ in range(1):
                 replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new,goal_vec_new), done])
         # implementing hindsight experience replay
         # replay_buffer.addHERSample([obs, action, reward, goal_img, obs_new, done], args.max_reward)
@@ -130,7 +130,7 @@ def train(args, device):
         # sample of the shape (s, a, r, g, s', done)
         replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new,goal_vec_new), done])
         if action_ind in [0,1]:
-            for _ in range(5):
+            for _ in range(1):
                 replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new,goal_vec_new), done])
         # implementing hindsight experience replay
         # replay_buffer.addHERSample([obs, action, reward, goal_img, obs_new, done], args.max_reward)
@@ -192,7 +192,6 @@ def test(args, device, model=None):
     while not done and step < args.steps_per_epoch:
         action = model.get_action(np.stack([obs]), np.stack([goal_img]))
         obs_new, reward, goal_info, done = env.step(action)
-        print(done)
 
         actions.append(action)
         locations.append([env.current_node, env.current_direction])
@@ -216,6 +215,7 @@ def test(args, device, model=None):
         human_actions.append(action_key[int(act)])
     print()
     print('Agent Actions:', list(zip(human_actions, ['to [node,dir]='] * len(locations), locations)))
+    print()
     # action_diffs = []
     # i=0
     # for act in optimal_solution[1]:
