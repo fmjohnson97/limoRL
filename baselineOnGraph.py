@@ -8,6 +8,8 @@ import time
 from models import SimpleSACDisc, ResnetBackbone, GoalReplayBuffer
 from graph import GraphTraverser, Graph
 
+from stable_baselines3.dqn.policies import DQNPolicy
+
 def getArgs():
     parser=argparse.ArgumentParser()
 
@@ -18,15 +20,15 @@ def getArgs():
     parser.add_argument('--batch_size', type=int, default=32, help='number of samples used to update the networks at once')
     parser.add_argument('--epochs', type=int, default=5000, help='number of epochs for training')
     parser.add_argument('--steps_per_epoch', type=int, default = 20, help='max number of steps for each epoch')
-    parser.add_argument('--use_policy_step', type=int, default=200, help='number of steps before using the learned policy')
+    parser.add_argument('--use_policy_step', type=int, default=100, help='number of steps before using the learned policy')
     parser.add_argument('--lr', type=float, default=1e-5, help='learning rate for training')
-    parser.add_argument('--save_name', default='sacDiscOnGraph', help='prefix name for saving the SAC networks')
-    parser.add_argument('--target_update_freq', type=int, default=20, help='max number of samples in the replay buffer')
+    parser.add_argument('--save_name', default='baselineOnGraph', help='prefix name for saving the SAC networks')
+    parser.add_argument('--target_update_freq', type=int, default=10, help='max number of samples in the replay buffer')
     parser.add_argument('--dist_reward', action='store_true', help='use the distance reward instead')
     parser.add_argument('--test', action='store_true', help='skip training and just test')
     parser.add_argument('--test_freq', type=int, default=10, help='number of epochs between testing')
     parser.add_argument('--epsilon', type=float, default=0.3, help='learning rate for training')
-    parser.add_argument('--feat_dim', type=int, default=12, help='network input dimensions')
+    parser.add_argument('--feat_dim', type=int, default=4, help='network input dimensions')
     parser.add_argument('--factor', type=int, default=1, help='hidden size of Q and Policy networks = feat_dim//factor')
 
 
@@ -57,7 +59,8 @@ def train(args, device):
 
     # initialize and populate the replay buffer
     replay_buffer = GoalReplayBuffer(args)
-    for step in range(args.buffer_init_steps):
+    step=0
+    while step < args.buffer_init_steps:
         # breakpoint()
         action = random.choice(range(env.action_space))
         # goal info is currently (start node,  star dir, goal node, goal dir)
@@ -73,10 +76,24 @@ def train(args, device):
         goal_img_new = []
         goal_vec_new = env.getLandmarkVector('goal')
         # sample of the shape (s, a, r, g, s', g', done)
-        replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
+        # controlling for not all forwards are successful in changing state
+        if action_ind==0:
+            if (obs==obs_new).all():
+                rand_int = random.random()
+                if rand_int>.9:
+                    step+=3
+                    for i in range(3):
+                        replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
+            else:
+                step += 6
+                for i in range(6):
+                    replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
+        else:
+            step+=1
+            replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
         # implementing hindsight experience replay
         # replay_buffer.addHERSample([obs, action, reward, goal_img, obs_new, done], args.max_reward)
-        if done or reward == 1 or (step>0 and step % args.steps_per_epoch==0):
+        if done or reward >= 1 or (step>0 and step % args.steps_per_epoch==0):
             env.randomInit()
             obs = env.getLandmarkVector()
         else:
@@ -98,7 +115,7 @@ def train(args, device):
         # initial random action or use the learned policy
         rand_num = random.random()
         # last part is epsilon greedy
-        if step < args.use_policy_step or rand_num < math.exp(-1. * step / 1000):
+        if step < args.use_policy_step or rand_num < math.exp(-1. * step / 500):
             action = random.choice(range(env.action_space))
             # goal info is currently (start node,  star dir, goal node, goal dir)
             # getting the goal images to save instead of the goal info (since that's really for debug purposes tbh)
@@ -110,7 +127,7 @@ def train(args, device):
             action = model.get_action(np.stack([obs]), np.stack([goal_vec]))
 
         # take action in the environment and save to replay/update trackers
-        # if step > args.use_policy_step:
+        # if step %50==0:# > args.use_policy_step:
         #     print('pre state+goal', (env.current_node, env.current_direction), (env.goalNode, env.goalDirection))
         obs_new, reward, goal_info, done = env.step(action)
         obs_new = env.getLandmarkVector()
@@ -121,11 +138,21 @@ def train(args, device):
         goal_img_new = []
         goal_vec_new = env.getLandmarkVector('goal')
         # sample of the shape (s, a, r, g, s', done)
-        replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new,goal_vec_new), done])
+        if action_ind == 0:
+            if (obs == obs_new).all():
+                rand_int = random.random()
+                if rand_int > .9:
+                    replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
+            else:
+                for i in range(2):
+                    replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
+        else:
+            replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
         # implementing hindsight experience replay
         # replay_buffer.addHERSample([obs, action, reward, goal_img, obs_new, done], args.max_reward)
-        # if step>args.use_policy_step:
+        # if step%50==0:#>args.use_policy_step:
         #     print('action+reward+state+goal', action, reward, (env.current_node, env.current_direction), (env.goalNode, env.goalDirection))
+        #     breakpoint()
         ep_reward+=reward
         ep_len+=1
 
@@ -221,7 +248,10 @@ def test(args, device, model=None):
     #     action_diffs.append(act)
     #     print()
     # print('Extraneous Actions:', action_diffs)
-    time.sleep(10)
+    time.sleep(5)
+    if len(human_actions)<args.steps_per_epoch:
+        test(args, device, model)
+        breakpoint()
     return total_reward
 
 

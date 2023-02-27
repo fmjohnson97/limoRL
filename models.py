@@ -8,7 +8,7 @@ import torch.optim as optim
 from PIL import Image
 from copy import deepcopy
 from torchvision.models import feature_extraction, resnet18, ResNet18_Weights
-from torch.nn import Linear, ReLU, Sigmoid, Conv2d, BatchNorm2d, ConvTranspose2d, Flatten, Sequential, Unflatten
+from torch.nn import Linear, ReLU, Sigmoid, Conv2d, BatchNorm2d, ConvTranspose2d, Flatten, Sequential, Unflatten, LeakyReLU
 from torch.distributions.categorical import Categorical
 
 def weights_init_(m):
@@ -334,6 +334,7 @@ class SimpleSACDisc(nn.Module):
         in_feats = np.concatenate((observation, goal_vec), axis=-1).reshape(len(observation), -1)
         in_feats = torch.FloatTensor(in_feats).to(self.device)
         action_dist, action, log_action = self.policyNetwork(in_feats)
+        # print('raw action', action)
         action = action.argmax(-1)
         return action.squeeze().cpu().numpy()
 
@@ -463,10 +464,8 @@ class QNetwork(nn.Module):
         self.fc2 = Linear(feat_dim // factor, feat_dim // factor)
         self.fc3 = Linear(feat_dim // factor, action_dim)
 
-        # self.fc1=Linear(feat_dim + action_dim,feat_dim)
-        # self.fc2 = Linear(feat_dim, action_dim)
-        self.prelu1 = ReLU()
-        self.prelu2 = ReLU()
+        self.prelu1 = LeakyReLU()
+        self.prelu2 = LeakyReLU()
 
         weights_init_(self.fc1)
         weights_init_(self.fc2)
@@ -488,10 +487,8 @@ class PolicyNetwork(nn.Module):
         self.fc2 = Linear(feat_dim // factor, feat_dim // factor)
         self.logits = Linear(feat_dim // factor, action_dim)
 
-        # self.fc1 = Linear(feat_dim , feat_dim )
-        # self.fc2 = Linear(feat_dim , action_dim)
-        self.prelu1 = ReLU()
-        self.prelu2 = ReLU()
+        self.prelu1 = LeakyReLU()
+        self.prelu2 = LeakyReLU()
         self.sigmoid = Sigmoid()
 
         weights_init_(self.fc1)
@@ -501,12 +498,10 @@ class PolicyNetwork(nn.Module):
     def forward(self, img_feats):
         #extracts features from the image observation
         feats = self.prelu1(self.fc1(img_feats))
-        # logits = self.sigmoid(self.fc2(feats))
         feats = self.prelu2(self.fc2(feats))
         #Needs to output [0: do nothing, 1: steer left, 2: steer right, 3: gas, 4: brake]
         logits = self.sigmoid(self.logits(feats))
 
-        # z = logits == 0.0
         z = logits < 1e-8
         z = z.float() * 1e-8
 

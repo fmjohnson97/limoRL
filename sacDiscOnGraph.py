@@ -13,7 +13,7 @@ def getArgs():
     parser=argparse.ArgumentParser()
 
     #file parameters
-    parser.add_argument('--config_file', type=str, default='labGraphConfig.json', help='path to the graph config file')
+    parser.add_argument('--config_file', type=str, default='labGraphConfig5.json', help='path to the graph config file')
 
     # training hyperparameters
     parser.add_argument('--batch_size', type=int, default=32, help='number of samples used to update the networks at once')
@@ -57,28 +57,39 @@ def train(args, device):
 
     # initialize and populate the replay buffer
     replay_buffer = GoalReplayBuffer(args)
-    for step in range(args.buffer_init_steps):
+    step = 0
+    while step < args.buffer_init_steps:
         # breakpoint()
         action = random.choice(range(env.action_space))
         # goal info is currently (start node,  star dir, goal node, goal dir)
         # getting the goal images to save instead of the goal info (since that's really for debug purposes tbh)
         goal_img = env.getGoalImg()
-        goal_vec = env.getGoalVector()
+        goal_vec = None #env.getGoalVector()
         obs_new, reward, goal_info, done = env.step(action)
         # transforming action to store it as a vector
         action_ind = action
         action = np.zeros(env.action_space)
         action[action_ind] = 1
         goal_img_new = env.getGoalImg()
-        goal_vec_new = env.getGoalVector()
+        goal_vec_new = None#env.getGoalVector()
         # sample of the shape (s, a, r, g, s', g', done)
-        replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
-        if action_ind==0:
-            for _ in range(1):
-                replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new,goal_vec_new), done])
+        if action_ind == 0:
+            if (obs == obs_new).all():
+                rand_int = random.random()
+                if rand_int > .9:
+                    step += 3
+                    for i in range(3):
+                        replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
+            else:
+                step += 6
+                for i in range(6):
+                    replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
+        else:
+            step += 1
+            replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
         # implementing hindsight experience replay
         # replay_buffer.addHERSample([obs, action, reward, goal_img, obs_new, done], args.max_reward)
-        if reward == 1 or step % args.steps_per_epoch==0:
+        if done or reward >= 1 or (step>0 and step % args.steps_per_epoch==0):
             env.randomInit()
             obs = env.getImg()
         else:
@@ -111,10 +122,10 @@ def train(args, device):
             # goal info is currently (start node,  star dir, goal node, goal dir)
             # getting the goal images to save instead of the goal info (since that's really for debug purposes tbh)
             goal_img = env.getGoalImg()
-            goal_vec = env.getGoalVector()
+            goal_vec = None#env.getGoalVector()
         else:
             goal_img = env.getGoalImg()
-            goal_vec = env.getGoalVector()
+            goal_vec = None#env.getGoalVector()
             action = model.get_action(np.stack([obs]), np.stack([goal_img]), np.stack([goal_vec]))
 
         # take action in the environment and save to replay/update trackers
@@ -126,12 +137,18 @@ def train(args, device):
         action = np.zeros(env.action_space)
         action[action_ind] = 1
         goal_img_new = env.getGoalImg()
-        goal_vec_new = env.getGoalVector()
-        # sample of the shape (s, a, r, g, s', done)
-        replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new,goal_vec_new), done])
-        if action_ind==0:
-            for _ in range(1):
-                replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new,goal_vec_new), done])
+        goal_vec_new = None#env.getGoalVector()
+        # sample of the shape (s, a, r, g, s', g', done)
+        # if action_ind == 0:
+        #     if (obs == obs_new).all():
+        #         rand_int = random.random()
+        #         if rand_int > .9:
+        #             replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
+        #     else:
+        #         for i in range(2):
+        #             replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
+        # else:
+        replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
         # implementing hindsight experience replay
         # replay_buffer.addHERSample([obs, action, reward, goal_img, obs_new, done], args.max_reward)
         # if step>args.use_policy_step:

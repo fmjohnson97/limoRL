@@ -68,6 +68,7 @@ class Graph():
         choice = random.choice(self.angleKey[str(vertex_num)][str(heading)])
         # breakpoint()
         image = cv2.imread(self.vertices[vertex_num - 1] + 'node' + str(vertex_num) + '_' + choice + self.config['photoExtension'])
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         return image
 
     def addNode(self, nodeFeatures=None, nodeFeatPath=None):
@@ -386,9 +387,15 @@ class GraphTraverser():
         #TODO: get rid of sign(directionality) or implement properly?
         landmark_pos = np.array(self.graph.config['landmarks'])
         if node is None:
-            return landmark_pos-self.graph.config['positions'][str(self.current_node)]
+            #giving it distance to landmarks concat with [node num, current direction]
+            # return landmark_pos - self.graph.config['positions'][str(self.current_node)]
+            # return np.concatenate((landmark_pos-self.graph.config['positions'][str(self.current_node)],np.array([[self.current_node, self.current_direction]])),axis=0)
+            return np.array([self.current_node/5, self.current_direction/360])
         elif node=='goal':
-            return landmark_pos - self.graph.config['positions'][str(self.goalNode)]
+            # giving it goal distance to landmarks concat with [goal node num, goal direction]
+            # return landmark_pos - self.graph.config['positions'][str(self.goalNode)]
+            # return np.concatenate((landmark_pos - self.graph.config['positions'][str(self.goalNode)],np.array([[self.goalNode, self.goalDirection]])), axis=0)
+            return np.array([self.goalNode/5, self.goalDirection/360])
         else:
             return landmark_pos - self.graph.config['positions'][str(node)]
 
