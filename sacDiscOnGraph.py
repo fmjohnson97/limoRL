@@ -85,7 +85,7 @@ def train(args, device):
         #         for i in range(5):
         #             replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
         # else:
-        #     step += 1
+        step += 1
         replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
         # implementing hindsight experience replay
         # replay_buffer.addHERSample([obs, action, reward, goal_img, obs_new, done], args.max_reward)
