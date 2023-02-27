@@ -145,7 +145,7 @@ def train(args, device):
                 # if rand_int > .9:
                 #     replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
             else:
-                for i in range(3):
+                for i in range(2):
                     replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
         else:
             replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
