@@ -95,7 +95,7 @@ def train(args, device):
         else:
             obs = obs_new
 
-    breakpoint()
+    # breakpoint()
     # initialize the model
     img_backbone = ResnetBackbone(args, device)
     # transforms = ResNet18_Weights.DEFAULT.transforms()
