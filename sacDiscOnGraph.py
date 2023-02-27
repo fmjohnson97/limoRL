@@ -4,6 +4,7 @@ import math
 import argparse
 import numpy as np
 
+import matplotlib.pyplot as plt
 from torchvision.models import ResNet18_Weights
 
 from models import SACDiscreteBaseline, ResnetBackbone, GoalReplayBuffer, Encoder32
@@ -53,8 +54,6 @@ def train(args, device):
     env.randomInit()
     obs = env.getImg()
 
-    #TODO: need to make SAC goal conditioned when getting actions!
-
     # initialize and populate the replay buffer
     replay_buffer = GoalReplayBuffer(args)
     step = 0
@@ -95,7 +94,7 @@ def train(args, device):
         else:
             obs = obs_new
 
-    # breakpoint()
+    breakpoint()
     # initialize the model
     img_backbone = ResnetBackbone(args, device)
     # transforms = ResNet18_Weights.DEFAULT.transforms()
@@ -118,7 +117,7 @@ def train(args, device):
         # initial random action or use the learned policy
         rand_num = random.random()
         # last part is epsilon greedy
-        if step < args.use_policy_step or rand_num < math.exp(-1. * step / 1000):
+        if step < args.use_policy_step or rand_num < math.exp(-1. * step / 800):
             action = random.choice(range(env.action_space))
             # goal info is currently (start node,  star dir, goal node, goal dir)
             # getting the goal images to save instead of the goal info (since that's really for debug purposes tbh)
@@ -146,7 +145,7 @@ def train(args, device):
                 # if rand_int > .9:
                 #     replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
             else:
-                for i in range(3):
+                for i in range(5):
                     replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
         else:
             replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
@@ -183,6 +182,8 @@ def train(args, device):
         total_policyloss += policyloss
 
         if step>0 and step % args.steps_per_epoch == 0 and (step // args.steps_per_epoch) % args.test_freq == 0:
+            temp = [a[1].argmax(-1) for a in replay_buffer.buffer]
+            print(len([a for a in temp if a==0])/len(temp),'is the forward percentage')
             test_reward = test(args, device, model)
 
     return model
@@ -223,7 +224,7 @@ def test(args, device, model=None):
     print('Total Reward',total_reward)
     # print('Actions: 0=straight, 1=backward, 2=left, 3=right')
     # the actions are bad bc don't actually take action so how know how to update the angles
-    optimal_solution = env.graph.findPath(start_node=start[0], end_node=goal[0], start_direction=start[1], end_direction=goal[1], base_angle=env.base_turn_angle*2)
+    optimal_solution = env.graph.findPath(start_node=start[0], end_node=goal[0], start_direction=start[1], end_direction=goal[1], base_angle=env.base_turn_angle)
     print('Optimal Solution:')
     print('path', optimal_solution[0])
     print('actions', optimal_solution[1])
