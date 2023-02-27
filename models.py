@@ -607,7 +607,8 @@ class GoalReplayBuffer():
         # sample of the shape (s, a, r, g, s', done)
         self.buffer.append(sample)
         while len(self.buffer)>self.limit:
-            self.buffer.pop(0)
+            ind = random.randint(0,self.limit-1)
+            self.buffer.pop(ind)
 
     # Hindsight Experience Replay
     def addHERSample(self, sample, new_reward):
