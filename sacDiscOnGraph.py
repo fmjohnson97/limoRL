@@ -81,8 +81,8 @@ def train(args, device):
                 #     for i in range(4):
                 #         replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
             else:
-                step += 9
-                for i in range(9):
+                step += 2
+                for i in range(2):
                     replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
         else:
             step += 1
@@ -95,6 +95,7 @@ def train(args, device):
         else:
             obs = obs_new
 
+    breakpoint()
     # initialize the model
     img_backbone = ResnetBackbone(args, device)
     # transforms = ResNet18_Weights.DEFAULT.transforms()
@@ -145,7 +146,7 @@ def train(args, device):
                 # if rand_int > .9:
                 #     replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
             else:
-                for i in range(9):
+                for i in range(3):
                     replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
         else:
             replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
