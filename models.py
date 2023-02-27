@@ -8,7 +8,7 @@ import torch.optim as optim
 from PIL import Image
 from copy import deepcopy
 from torchvision.models import feature_extraction, resnet18, ResNet18_Weights
-from torch.nn import Linear, ReLU, Sigmoid, Conv2d, BatchNorm2d, ConvTranspose2d, Flatten, Sequential, Unflatten, LeakyReLU
+from torch.nn import Linear, ReLU, Sigmoid, Conv2d, BatchNorm2d, ConvTranspose2d, Flatten, Sequential, Unflatten, GELU
 from torch.distributions.categorical import Categorical
 
 def weights_init_(m):
@@ -60,33 +60,9 @@ class ResnetBackbone():
         img = torch.tensor(img).transpose(-1, 1)
         img_ext=self.preprocess(img).to(self.device)
         features = self.feat_ext(img_ext)
-        # if len(img.shape)>4:
-        #     temp = img
-        #     img = []
-        #     for t in temp:
-        #         img.extend(t)
-        #     img = torch.stack(img)
-        # # breakpoint()
-        # img_ext=[]
-        # if len(img.shape)==4 and type(img) != Image:
-        #     for im in img:
-        #         if type(im)==torch.Tensor:
-        #             im = Image.fromarray(im.cpu().numpy().astype(np.uint8))
-        #         else:
-        #             im = Image.fromarray(im)
-        #         img_ext.append(torch.tensor(self.preprocess(im)))
-        #     img_ext=torch.stack(img_ext).to(self.device)
-        # else:
-        #     # breakpoint()
-        #     try:
-        #         img_ext=torch.tensor(img).unsqueeze(0).to(self.device)
-        #     except Exception as e:
-        #         print(e)
-        #         breakpoint()
-        #
-        # features = self.feat_ext(img_ext)
-        # breakpoint()
-        return features[self.return_node].reshape(len(features[self.return_node]), -1)
+
+        return features[self.return_node].transpose(1,2)
+        # return features[self.return_node].reshape(len(features[self.return_node]), -1)
 
 class SACDiscreteBaseline(nn.Module):
     def __init__(self, args, backbone, action_dim, device):
@@ -102,19 +78,19 @@ class SACDiscreteBaseline(nn.Module):
         self.backbone=backbone
         # initialize networks
         # note: all using a shared feature extractor which isn't getting any loss backprop-ed
-        feat_dim= 512 * 7 * 7 * 2# + 2*3 #*2 is for goal # cnn 4096# fc 2048 # resnet 512 * 7 * 7
+        feat_dim= 16#512 * 7 * 7 * 2# + 2*3 #*2 is for goal # cnn 4096# fc 2048 # resnet 512 * 7 * 7
         # self.img_fc = Linear(96*96*3,feat_dim).to(device)
         # self.img_fc = nn.Sequential(Conv2d(3, 32, kernel_size=8, stride=4, padding=0), ReLU(),
         #                             Conv2d(32, 64, kernel_size=4, stride=2, padding=0), ReLU(),
         #                             Conv2d(64, 64, kernel_size=3, stride=1, padding=0), Flatten()).to(device)
         # self.prelu = PReLU().to(device)
-        self.q1network = QNetwork(feat_dim, action_dim).to(device)
+        self.q1network = QConvNetwork(feat_dim, action_dim).to(device)
         self.targetQ1 = deepcopy(self.q1network)
         # self.targetQ1 = self.targetQ1.to(device)
-        self.q2network = QNetwork(feat_dim, action_dim).to(device)
+        self.q2network = QConvNetwork(feat_dim, action_dim).to(device)
         self.targetQ2 = deepcopy(self.q2network)
         # self.targetQ2 = self.targetQ2.to(device)
-        self.policyNetwork = PolicyNetwork(args, feat_dim, action_dim).to(device)
+        self.policyNetwork = PolicyConvNetwork(args, feat_dim, action_dim).to(device)
 
         # gathering hyperparameters
         self.gamma = args.gamma
@@ -464,8 +440,8 @@ class QNetwork(nn.Module):
         self.fc2 = Linear(feat_dim // factor, feat_dim // factor)
         self.fc3 = Linear(feat_dim // factor, action_dim)
 
-        self.prelu1 = LeakyReLU()
-        self.prelu2 = LeakyReLU()
+        self.prelu1 = GELU()
+        self.prelu2 = GELU()
 
         weights_init_(self.fc1)
         weights_init_(self.fc2)
@@ -487,8 +463,8 @@ class PolicyNetwork(nn.Module):
         self.fc2 = Linear(feat_dim // factor, feat_dim // factor)
         self.logits = Linear(feat_dim // factor, action_dim)
 
-        self.prelu1 = LeakyReLU()
-        self.prelu2 = LeakyReLU()
+        self.prelu1 = GELU()
+        self.prelu2 = GELU()
         self.sigmoid = Sigmoid()
 
         weights_init_(self.fc1)
@@ -501,6 +477,61 @@ class PolicyNetwork(nn.Module):
         feats = self.prelu2(self.fc2(feats))
         #Needs to output [0: do nothing, 1: steer left, 2: steer right, 3: gas, 4: brake]
         logits = self.sigmoid(self.logits(feats))
+
+        z = logits < 1e-8
+        z = z.float() * 1e-8
+
+        # print('logits',logits.mean(), (logits+z).mean(), torch.log(logits+z).mean())
+        # breakpoint()
+
+        return Categorical(logits+z), logits + z, torch.log(logits + z)
+
+class QConvNetwork(nn.Module):
+    def __init__(self, feat_dim, action_dim, factor=256):
+        super(QConvNetwork, self).__init__()
+        self.conv1 = Conv2d(7, feat_dim, kernel_size=3, padding=1, stride=2)  # 32x32 => 16x16
+        self.activ = GELU()
+        self.conv2 = nn.Conv2d(feat_dim, feat_dim, kernel_size=3, padding=1)
+        self.conv3 = Conv2d(feat_dim, 2 * feat_dim, kernel_size=3, padding=1, stride=2)  # 16x16 => 8x8
+        self.conv4 = Conv2d(2 * feat_dim, 2 * feat_dim, kernel_size=3, padding=1)
+        self.conv5 = nn.Conv2d(2 * feat_dim, 2 * feat_dim, kernel_size=3, padding=1, stride=2)  # 8x8 => 4x4
+        self.fc1 = nn.Linear(32*64*2+action_dim, feat_dim*4)
+        self.fc2 = nn.Linear(feat_dim*4, action_dim)
+
+    def forward(self, img_feats, action):
+        # breakpoint()
+        x = self.activ(self.conv1(img_feats))
+        x = self.activ(self.conv2(x))
+        x = self.activ(self.conv3(x))
+        x = self.activ(self.conv4(x))
+        x = self.activ(self.conv5(x))
+        x = self.activ(self.fc1(torch.cat((torch.flatten(x,1),action), axis=-1)))
+        x = self.fc2(x)
+        return x
+
+class PolicyConvNetwork(nn.Module):
+    def __init__(self, args, feat_dim, action_dim, factor=256):
+        super(PolicyConvNetwork, self).__init__()
+        self.conv1 = Conv2d(7, feat_dim, kernel_size=3, padding=1, stride=2)  # 32x32 => 16x16
+        self.activ = GELU()
+        self.conv2 = nn.Conv2d(feat_dim, feat_dim, kernel_size=3, padding=1)
+        self.conv3 = Conv2d(feat_dim, 2 * feat_dim, kernel_size=3, padding=1, stride=2)  # 16x16 => 8x8
+        self.conv4 = Conv2d(2 * feat_dim, 2 * feat_dim, kernel_size=3, padding=1)
+        self.conv5 = nn.Conv2d(2 * feat_dim, 2 * feat_dim, kernel_size=3, padding=1, stride=2)  # 8x8 => 4x4
+        self.fc1 = nn.Linear(32*64*2, feat_dim*4)
+        self.logits = nn.Linear(feat_dim*4, action_dim)
+        self.sigmoid = Sigmoid()
+
+    def forward(self, img_feats):
+        # breakpoint()
+        #extracts features from the image observation
+        x = self.activ(self.conv1(img_feats))
+        x = self.activ(self.conv2(x))
+        x = self.activ(self.conv3(x))
+        x = self.activ(self.conv4(x))
+        x = self.activ(self.conv5(x))
+        x = self.activ(self.fc1(torch.flatten(x,1)))
+        logits = self.sigmoid(self.logits(x))
 
         z = logits < 1e-8
         z = z.float() * 1e-8
