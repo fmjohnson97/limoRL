@@ -94,7 +94,7 @@ def train(args, device):
         else:
             obs = obs_new
 
-    breakpoint()
+    # breakpoint()
     # initialize the model
     img_backbone = ResnetBackbone(args, device)
     # transforms = ResNet18_Weights.DEFAULT.transforms()
@@ -145,7 +145,7 @@ def train(args, device):
                 # if rand_int > .9:
                 #     replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
             else:
-                for i in range(5):
+                for i in range(3):
                     replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
         else:
             replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
@@ -183,7 +183,8 @@ def train(args, device):
 
         if step>0 and step % args.steps_per_epoch == 0 and (step // args.steps_per_epoch) % args.test_freq == 0:
             temp = [a[1].argmax(-1) for a in replay_buffer.buffer]
-            print(len([a for a in temp if a==0])/len(temp),'is the forward percentage')
+            print(len([a for a in temp if a == 0]) / len(temp), 'is the forward percentage')
+            print(len([a for a in temp if a == 1]) / len(temp), 'is the left percentage')
             test_reward = test(args, device, model)
 
     return model
