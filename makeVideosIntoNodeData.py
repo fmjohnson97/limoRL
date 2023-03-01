@@ -15,6 +15,7 @@ def saveVideoFrames(video_path, save_path):
     base_name = save_path.split('/')[-2]
     # breakpoint()
     while ret == True:
+        frame = cv2.resize(frame,(frame.shape[1]//4, frame.shape[0]//4))
         cv2.imwrite(save_path+base_name+'_im'+str(img_num)+'.png', frame)
         img_num+=1
         ret, frame = cap.read()
@@ -120,6 +121,7 @@ def createLabelSplits(label_path):
     for im in val:
         val_angs.append(labels[im][-1])
 
+    print(label_path)
     plt.figure()
     plt.hist(train_angs, bins=range(361))
     plt.title('train angles')
@@ -133,7 +135,7 @@ def createLabelSplits(label_path):
     plt.title('val angles')
     plt.show()
 
-    breakpoint()
+    # breakpoint()
     labels['train']=train
     labels['test']=test
     labels['val']=val
@@ -183,16 +185,19 @@ if __name__=='__main__':
     # video_files = glob('nodeVideos/*')
     # for vfile in tqdm(video_files):
     #     save_path = vfile.split('/')[-1].split('.')[0]
-    #     saveVideoFrames(vfile,'nodePhotos/'+save_path+'/')
+    #     saveVideoFrames(vfile,'nodePhotosSmall/'+save_path+'/')
 
     # interpolate angle labels for images on the nodes
-    # photo_folders = glob('nodePhotos/*')
-    # for folder in photo_folders:
-    #     interpolateFrameAngleLabels(folder+'/labels.json')
-    #     createLabelSplits(folder+'/labels.json')
-
+    # photo_folders = glob('nodePhotosSmall/*')
+    # for folder in tqdm(photo_folders):
+    #     try:
+    #         interpolateFrameAngleLabels(folder+'/labels.json')
+    #         createLabelSplits(folder+'/labels.json')
+    #     except:
+    #         pass
+    #
     # makeNodeAngleListFile(photo_folders)
 
     # resize all the images and copy over the labels json files
     resizeAllImages('nodePhotos/', 'nodePhotosSmall/')
-    copyLabelsJsonFiles('nodePhotos/', 'nodePhotosSmall/')
+    # copyLabelsJsonFiles('nodePhotosSmall_old/', 'nodePhotosSmall/')

@@ -19,8 +19,9 @@ class AllNodePhotosData(Dataset):
         elif mode=='test':
             self.inds = [i for i in self.inds if i % 8 == 0 or i % 9 == 0]
         else:
-            print("Unsupported dataset split:",mode)
-            breakpoint()
+            pass
+            # print("Unsupported dataset split:",mode)
+            # breakpoint()
 
         self.paths = np.array(self.paths)[self.inds]
 
