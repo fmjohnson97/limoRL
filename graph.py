@@ -176,6 +176,7 @@ class GraphTraverser():
         self.current_node = self.start_node
         self.current_direction = 180
         self.fig, self.ax = plt.subplots(1,1)
+        self.setGoalNode()
         if self.recordActions:
             self.path = [self.current_node]
             self.actions = []
