@@ -60,7 +60,7 @@ class Graph():
 
     def getVertexFeats(self, vertex_num, heading=None, heading_threshold=1):
         if heading is None:
-            heading = random.choice(range(0,360,5)) #TODO: expand to all angles maybe?
+            heading = random.choice(range(0,360,15)) #TODO: expand to all angles maybe?
 
         while str(heading) not in self.angleKey[str(vertex_num)].keys():
             heading = (heading + 1) % 360
@@ -393,12 +393,12 @@ class GraphTraverser():
             #giving it distance to landmarks concat with [node num, current direction]
             # return landmark_pos - self.graph.config['positions'][str(self.current_node)]
             # return np.concatenate((landmark_pos-self.graph.config['positions'][str(self.current_node)],np.array([[self.current_node, self.current_direction]])),axis=0)
-            return np.array([self.current_node/5, self.current_direction/360])
+            return np.array([self.current_node/len(graph.vertices), self.current_direction/360])
         elif node=='goal':
             # giving it goal distance to landmarks concat with [goal node num, goal direction]
             # return landmark_pos - self.graph.config['positions'][str(self.goalNode)]
             # return np.concatenate((landmark_pos - self.graph.config['positions'][str(self.goalNode)],np.array([[self.goalNode, self.goalDirection]])), axis=0)
-            return np.array([self.goalNode/5, self.goalDirection/360])
+            return np.array([self.goalNode/len(graph.vertices), self.goalDirection/360])
         else:
             return landmark_pos - self.graph.config['positions'][str(node)]
 
