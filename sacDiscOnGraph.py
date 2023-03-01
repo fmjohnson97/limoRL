@@ -93,7 +93,7 @@ def train(args, device):
         if done or reward >= 1 or (step>0 and step % args.steps_per_epoch==0):
             env.randomInit()
             obs = env.getImg()
-            print('Goal is', env.goalNode, env.goalDirection)
+            # print('Goal is', env.goalNode, env.goalDirection)
         else:
             obs = obs_new
 
@@ -165,7 +165,7 @@ def train(args, device):
         if done or ep_len>=args.steps_per_epoch:
             env.randomInit()
             obs = env.getImg()
-            print('Goal is', env.goalNode, env.goalDirection)
+            # print('Goal is', env.goalNode, env.goalDirection)
             print('Epoch',ep_count,'completed in',ep_len,'steps with reward =',ep_reward)
             print('\t Total Q Loss:',total_qloss,' Avg Q Loss:',total_qloss/ep_len)
             print('\t Total Policy Loss:',total_policyloss,' Avg Policy Loss:',total_policyloss/ep_len)
