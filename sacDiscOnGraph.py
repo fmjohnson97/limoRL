@@ -177,8 +177,7 @@ def train(args, device):
                 if temp>-20 and temp<1:
                     print('Training Done!')
                     exit(0)
-                else:
-                    breakpoint()
+
             ep_len=0
             ep_reward=0
             total_qloss = 0
@@ -206,8 +205,7 @@ def train(args, device):
 
 def test(args, device, model=None):
     print('testing!')
-    env = GraphTraverser(Graph(config_path=args.config_file))
-
+    env = GraphTraverser(Graph(config_path=args.config_file), distance_reward=args.dist_reward)
     if model is None:
         img_backbone = ResnetBackbone(args, device)
         model = SACDiscreteBaseline(args, img_backbone, env.action_space, device)
