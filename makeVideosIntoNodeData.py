@@ -151,7 +151,7 @@ def makeNodeAngleListFile(node_photo_folder):
         labels.pop('train')
         labels.pop('val')
         labels.pop('test')
-        breakpoint()
+        # breakpoint()
         angle_list = defaultdict(list)
         for k,v in labels.items():
             angle_list[v[-1]].append(k)
