@@ -168,7 +168,7 @@ def train(args, device):
             print('\t Total Policy Loss:',total_policyloss,' Avg Policy Loss:',total_policyloss/ep_len)
             print()
             all_total_rewards.append(ep_reward)
-            if len(all_total_rewards)>5 and step>args.use_policy_step and np.mean(all_total_rewards[-5:]) > -11:
+            if len(all_total_rewards)>5 and step>args.use_policy_step and np.mean(all_total_rewards[-5:]) > -11/10:
                 print('Step:',step)
                 temp = [a[1].argmax(-1) for a in replay_buffer.buffer]
                 print(len([a for a in temp if a == 0]) / len(temp), 'is the forward percentage')
