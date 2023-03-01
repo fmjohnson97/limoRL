@@ -176,8 +176,12 @@ def train(args, device):
                 temp = [a[1].argmax(-1) for a in replay_buffer.buffer]
                 print(len([a for a in temp if a == 0]) / len(temp), 'is the forward percentage')
                 print(len([a for a in temp if a == 1]) / len(temp), 'is the left percentage')
-                temp = test(args, device, model, env.goalNode, env.goalDirection)
-                if temp>-20/10 and temp<1:
+                count = 0
+                temp=0
+                while count<5 and temp>-2:
+                    temp = test(args, device, model, env.goalNode, env.goalDirection)
+                    count+=1
+                if count>=5:
                     print('Training Done!')
                     exit(0)
 
