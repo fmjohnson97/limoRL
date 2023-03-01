@@ -61,7 +61,7 @@ class ResnetBackbone():
         img_ext=self.preprocess(img).to(self.device)
         features = self.feat_ext(img_ext)
 
-        return features[self.return_node].transpose(1,2)
+        return features[self.return_node]#.transpose(1,2)
         # return features[self.return_node].reshape(len(features[self.return_node]), -1)
 
 class SACDiscreteBaseline(nn.Module):
@@ -78,7 +78,7 @@ class SACDiscreteBaseline(nn.Module):
         self.backbone=backbone
         # initialize networks
         # note: all using a shared feature extractor which isn't getting any loss backprop-ed
-        feat_dim= 16#512 * 7 * 7 * 2# + 2*3 #*2 is for goal # cnn 4096# fc 2048 # resnet 512 * 7 * 7
+        feat_dim= 1024#512 * 7 * 7 * 2# + 2*3 #*2 is for goal # cnn 4096# fc 2048 # resnet 512 * 7 * 7
         # self.img_fc = Linear(96*96*3,feat_dim).to(device)
         # self.img_fc = nn.Sequential(Conv2d(3, 32, kernel_size=8, stride=4, padding=0), ReLU(),
         #                             Conv2d(32, 64, kernel_size=4, stride=2, padding=0), ReLU(),
@@ -124,7 +124,8 @@ class SACDiscreteBaseline(nn.Module):
         # breakpoint()
         img_feats = self.backbone.extractFeatures(observation)
         goal_feats = self.backbone.extractFeatures(goal_obs)
-        img_feats = torch.cat((img_feats,goal_feats), axis=-1)
+        # img_feats = torch.cat((img_feats,goal_feats), axis=-1)
+        img_feats = torch.cat((img_feats, goal_feats), axis=1)
         if goal_vec is not None and sum(goal_vec==None)==0:
             img_feats = torch.cat((img_feats,torch.FloatTensor(goal_vec.reshape(len(img_feats), -1)).to(self.device)), axis=-1)
         action_dist, action, log_action = self.policyNetwork(img_feats)
@@ -141,7 +142,8 @@ class SACDiscreteBaseline(nn.Module):
         goal_imgs_new, goal_vec_new = np.stack(goal_new[:,0]), np.stack(goal_new[:,1])
         img_new_feats = self.backbone.extractFeatures(observation_new) #self.prelu(self.img_fc(observation_new)) #
         goal_feats_new = self.backbone.extractFeatures(goal_imgs_new)
-        img_new_feats = torch.cat((img_new_feats, goal_feats_new), axis=-1)
+        # img_new_feats = torch.cat((img_new_feats, goal_feats_new), axis=-1)
+        img_new_feats = torch.cat((img_new_feats, goal_feats_new), axis=1)
         if goal_vec_new is not None and sum(goal_vec_new==None)==0:
             img_new_feats = torch.cat((img_new_feats,torch.FloatTensor(goal_vec_new.reshape(len(img_new_feats), -1)).to(self.device)), axis=-1)
         # print('imgnew',img_new_feats.mean())
@@ -164,7 +166,8 @@ class SACDiscreteBaseline(nn.Module):
         goal_imgs, goal_vec = np.stack(goal[:,0]), np.stack(goal[:,1])
         img_feats = self.backbone.extractFeatures(observation) #self.prelu(self.img_fc(observation)) #
         goal_feats = self.backbone.extractFeatures(goal_imgs)
-        img_feats = torch.cat((img_feats,goal_feats), axis=-1)
+        # img_feats = torch.cat((img_feats,goal_feats), axis=-1)
+        img_feats = torch.cat((img_feats, goal_feats), axis=1)
         if goal_vec is not None and sum(goal_vec==None)==0:
             img_feats = torch.cat((img_feats,torch.FloatTensor(goal_vec.reshape(len(img_feats), -1)).to(self.device)), axis=-1)
         action = torch.FloatTensor(action)#.reshape(-1,1)
@@ -189,10 +192,10 @@ class SACDiscreteBaseline(nn.Module):
         self.q2_opt.step()
 
         # freeze q weights to ease policy network backprop computation
-        # for param in self.q1network.parameters():
-        #     param.requires_grad = False
-        # for param in self.q2network.parameters():
-        #     param.requires_grad = False
+        for param in self.q1network.parameters():
+            param.requires_grad = False
+        for param in self.q2network.parameters():
+            param.requires_grad = False
 
         # breakpoint()
         # compute policy network loss and backprop it
@@ -221,10 +224,10 @@ class SACDiscreteBaseline(nn.Module):
                     targ_param.data.add_((1 - self.polyak) * param.data)
 
         # turn grad back on for the q networks
-        # for param in self.q1network.parameters():
-        #     param.requires_grad = True
-        # for param in self.q2network.parameters():
-        #     param.requires_grad = True
+        for param in self.q1network.parameters():
+            param.requires_grad = True
+        for param in self.q2network.parameters():
+            param.requires_grad = True
 
         # return q_loss.item(), policy_loss.item()
         return (q1_loss+q2_loss).item(), policy_loss.item()
@@ -489,14 +492,14 @@ class PolicyNetwork(nn.Module):
 class QConvNetwork(nn.Module):
     def __init__(self, feat_dim, action_dim, factor=256):
         super(QConvNetwork, self).__init__()
-        self.conv1 = Conv2d(7, feat_dim, kernel_size=3, padding=1, stride=2)  # 32x32 => 16x16
+        self.conv1 = Conv2d(feat_dim, factor, kernel_size=3, padding=1, stride=2)  # 32x32 => 16x16
         self.activ = GELU()
-        self.conv2 = nn.Conv2d(feat_dim, feat_dim, kernel_size=3, padding=1)
-        self.conv3 = Conv2d(feat_dim, 2 * feat_dim, kernel_size=3, padding=1, stride=2)  # 16x16 => 8x8
-        self.conv4 = Conv2d(2 * feat_dim, 2 * feat_dim, kernel_size=3, padding=1)
-        self.conv5 = nn.Conv2d(2 * feat_dim, 2 * feat_dim, kernel_size=3, padding=1, stride=2)  # 8x8 => 4x4
-        self.fc1 = nn.Linear(32*64*2+action_dim, feat_dim*4)
-        self.fc2 = nn.Linear(feat_dim*4, action_dim)
+        self.conv2 = nn.Conv2d(factor, factor, kernel_size=3, padding=1)
+        self.conv3 = Conv2d(factor, 2 * factor, kernel_size=3, padding=1, stride=2)  # 16x16 => 8x8
+        self.conv4 = Conv2d(2 * factor, 2 * factor, kernel_size=3, padding=1)
+        self.conv5 = nn.Conv2d(2 * factor, 2 * factor, kernel_size=3, padding=1, stride=2)  # 8x8 => 4x4
+        self.fc1 = nn.Linear(512+action_dim, factor//4)
+        self.fc2 = nn.Linear(factor//4, action_dim)
 
     def forward(self, img_feats, action):
         # breakpoint()
@@ -512,14 +515,14 @@ class QConvNetwork(nn.Module):
 class PolicyConvNetwork(nn.Module):
     def __init__(self, args, feat_dim, action_dim, factor=256):
         super(PolicyConvNetwork, self).__init__()
-        self.conv1 = Conv2d(7, feat_dim, kernel_size=3, padding=1, stride=2)  # 32x32 => 16x16
+        self.conv1 = Conv2d(feat_dim, factor, kernel_size=3, padding=1, stride=2)  # 32x32 => 16x16
         self.activ = GELU()
-        self.conv2 = nn.Conv2d(feat_dim, feat_dim, kernel_size=3, padding=1)
-        self.conv3 = Conv2d(feat_dim, 2 * feat_dim, kernel_size=3, padding=1, stride=2)  # 16x16 => 8x8
-        self.conv4 = Conv2d(2 * feat_dim, 2 * feat_dim, kernel_size=3, padding=1)
-        self.conv5 = nn.Conv2d(2 * feat_dim, 2 * feat_dim, kernel_size=3, padding=1, stride=2)  # 8x8 => 4x4
-        self.fc1 = nn.Linear(32*64*2, feat_dim*4)
-        self.logits = nn.Linear(feat_dim*4, action_dim)
+        self.conv2 = nn.Conv2d(factor, factor, kernel_size=3, padding=1)
+        self.conv3 = Conv2d(factor, 2 * factor, kernel_size=3, padding=1, stride=2)  # 16x16 => 8x8
+        self.conv4 = Conv2d(2 * factor, 2 * factor, kernel_size=3, padding=1)
+        self.conv5 = nn.Conv2d(2 * factor, 2 * factor, kernel_size=3, padding=1, stride=2)  # 8x8 => 4x4
+        self.fc1 = nn.Linear(512, factor//4)
+        self.logits = nn.Linear(factor//4, action_dim)
         self.sigmoid = Sigmoid()
 
     def forward(self, img_feats):
