@@ -151,14 +151,14 @@ def makeNodeAngleListFile(node_photo_folder):
         labels.pop('train')
         labels.pop('val')
         labels.pop('test')
-
+        breakpoint()
         angle_list = defaultdict(list)
         for k,v in labels.items():
             angle_list[v[-1]].append(k)
 
         node_angle_key[node_folder.split('node')[-1]]=angle_list
 
-    with open('nodeAngleKey.json', 'a') as f:
+    with open('labGraphAngleKey.json', 'w') as f:
         json.dump(node_angle_key,f)
 
 def resizeAllImages(node_photo_folder, new_folder):
@@ -188,7 +188,7 @@ if __name__=='__main__':
     #     saveVideoFrames(vfile,'nodePhotosSmall/'+save_path+'/')
 
     # interpolate angle labels for images on the nodes
-    # photo_folders = glob('nodePhotosSmall/*')
+    photo_folders = glob('nodePhotosSmall/*')
     # for folder in tqdm(photo_folders):
     #     try:
     #         interpolateFrameAngleLabels(folder+'/labels.json')
@@ -196,8 +196,8 @@ if __name__=='__main__':
     #     except:
     #         pass
     #
-    # makeNodeAngleListFile(photo_folders)
+    makeNodeAngleListFile(photo_folders)
 
     # resize all the images and copy over the labels json files
-    resizeAllImages('nodePhotos/', 'nodePhotosSmall/')
+    # resizeAllImages('nodePhotos/', 'nodePhotosSmall/')
     # copyLabelsJsonFiles('nodePhotosSmall_old/', 'nodePhotosSmall/')

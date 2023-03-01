@@ -67,8 +67,11 @@ class Graph():
 
         choice = random.choice(self.angleKey[str(vertex_num)][str(heading)])
         # breakpoint()
-        image = cv2.imread(self.vertices[vertex_num - 1] + 'node' + str(vertex_num) + '_' + choice + self.config['photoExtension'])
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        try:
+            image = cv2.imread(self.vertices[vertex_num - 1] + 'node' + str(vertex_num) + '_' + choice + self.config['photoExtension'])
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        except:
+            breakpoint()
         return image
 
     def addNode(self, nodeFeatures=None, nodeFeatPath=None):
