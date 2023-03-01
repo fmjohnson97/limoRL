@@ -167,7 +167,7 @@ def train(args, device):
             print('\t Total Policy Loss:',total_policyloss,' Avg Policy Loss:',total_policyloss/ep_len)
             print()
             all_total_rewards.append(ep_reward)
-            if np.mean(all_total_rewards[-5:]) > -15:
+            if len(all_total_rewards)>5 and step>args.use_policy_step and np.mean(all_total_rewards[-5:]) > -15:
                 temp = test(args, device, model)
                 if temp>-20:
                     print('Training Done!')
