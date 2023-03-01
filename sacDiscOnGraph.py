@@ -174,7 +174,7 @@ def train(args, device):
                 print(len([a for a in temp if a == 0]) / len(temp), 'is the forward percentage')
                 print(len([a for a in temp if a == 1]) / len(temp), 'is the left percentage')
                 temp = test(args, device, model)
-                if temp>-20 and temp<1:
+                if temp>-20/10 and temp<1:
                     print('Training Done!')
                     exit(0)
 
