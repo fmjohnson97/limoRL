@@ -93,6 +93,7 @@ def train(args, device):
         if done or reward >= 1 or (step>0 and step % args.steps_per_epoch==0):
             env.randomInit()
             obs = env.getImg()
+            print('Goal is', env.goalNode, env.goalDirection)
         else:
             obs = obs_new
 
@@ -164,6 +165,7 @@ def train(args, device):
         if done or ep_len>=args.steps_per_epoch:
             env.randomInit()
             obs = env.getImg()
+            print('Goal is', env.goalNode, env.goalDirection)
             print('Epoch',ep_count,'completed in',ep_len,'steps with reward =',ep_reward)
             print('\t Total Q Loss:',total_qloss,' Avg Q Loss:',total_qloss/ep_len)
             print('\t Total Policy Loss:',total_policyloss,' Avg Policy Loss:',total_policyloss/ep_len)
@@ -174,7 +176,7 @@ def train(args, device):
                 temp = [a[1].argmax(-1) for a in replay_buffer.buffer]
                 print(len([a for a in temp if a == 0]) / len(temp), 'is the forward percentage')
                 print(len([a for a in temp if a == 1]) / len(temp), 'is the left percentage')
-                temp = test(args, device, model)
+                temp = test(args, device, model, env.goalNode, env.goalDirection)
                 if temp>-20/10 and temp<1:
                     print('Training Done!')
                     exit(0)
@@ -200,13 +202,17 @@ def train(args, device):
             temp = [a[1].argmax(-1) for a in replay_buffer.buffer]
             print(len([a for a in temp if a == 0]) / len(temp), 'is the forward percentage')
             print(len([a for a in temp if a == 1]) / len(temp), 'is the left percentage')
-            test_reward = test(args, device, model)
+            test_reward = test(args, device, model, env.goalNode, env.goalDirection)
 
     return model
 
-def test(args, device, model=None):
+def test(args, device, model=None, goalNode=None, goalDirection=None):
     print('testing!')
     env = GraphTraverser(Graph(config_path=args.config_file), distance_reward=args.dist_reward)
+    if goalNode is not None:
+        env.goalNode = goalNode
+    if goalDirection is not None:
+        env.goalDirection = goalDirection
     if model is None:
         img_backbone = ResnetBackbone(args, device)
         model = SACDiscreteBaseline(args, img_backbone, env.action_space, device)
