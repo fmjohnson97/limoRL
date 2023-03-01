@@ -72,20 +72,20 @@ def train(args, device):
         goal_img_new = env.getGoalImg()
         goal_vec_new = None#env.getGoalVector()
         # sample of the shape (s, a, r, g, s', g', done)
-        if action_ind == 0:
-            if (obs == obs_new).all():
-                rand_int = random.random()
-                # if rand_int > .8:
-                #     step += 4
-                #     for i in range(4):
-                #         replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
-            else:
-                step += 2
-                for i in range(2):
-                    replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
-        else:
-            step += 1
-            replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
+        # if action_ind == 0:
+        #     if (obs == obs_new).all():
+        #         rand_int = random.random()
+        #         # if rand_int > .8:
+        #         #     step += 4
+        #         #     for i in range(4):
+        #         #         replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
+        #     else:
+        #         step += 2
+        #         for i in range(2):
+        #             replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
+        # else:
+        step += 1
+        replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
         # implementing hindsight experience replay
         # replay_buffer.addHERSample([obs, action, reward, goal_img, obs_new, done], args.max_reward)
         if done or reward >= 1 or (step>0 and step % args.steps_per_epoch==0):
@@ -140,16 +140,16 @@ def train(args, device):
         goal_img_new = env.getGoalImg()
         goal_vec_new = None#env.getGoalVector()
         # sample of the shape (s, a, r, g, s', g', done)
-        if action_ind == 0:
-            if (obs == obs_new).all():
-                rand_int = random.random()
-                # if rand_int > .9:
-                #     replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
-            else:
-                for i in range(1):
-                    replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
-        else:
-            replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
+        # if action_ind == 0:
+        #     if (obs == obs_new).all():
+        #         rand_int = random.random()
+        #         # if rand_int > .9:
+        #         #     replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
+        #     else:
+        #         for i in range(1):
+        #             replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
+        # else:
+        replay_buffer.addSample([obs, action, reward, (goal_img, goal_vec), obs_new, (goal_img_new, goal_vec_new), done])
         # implementing hindsight experience replay
         # replay_buffer.addHERSample([obs, action, reward, goal_img, obs_new, done], args.max_reward)
         # if step>args.use_policy_step:
