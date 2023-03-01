@@ -53,6 +53,7 @@ def train(args, device):
     # initialize the environment and get the first observation
     env = GraphTraverser(Graph(config_path=args.config_file), distance_reward=args.dist_reward)
     env.randomInit()
+    print('Goal is', env.goalNode, env.goalDirection)
     obs = env.getImg()
 
     # initialize and populate the replay buffer
