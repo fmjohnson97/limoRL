@@ -128,15 +128,20 @@ class Graph():
             actions.extend(next_steps[1])
             return [path, actions]
         else:
-            breakpoint()
+            # breakpoint()
             next_steps=[]
             for node in next_nodes:
                 next_steps.append(self.findPath(node[1], end_node,start_direction,node[2]))
             step_lens = [[len(x[1]),i] for i,x in enumerate(next_steps) if len(x[1])>0]
-            breakpoint()
-            path.extend(next_steps[0])
-            actions.extend(next_steps[1])
+            # breakpoint()
+            smallest = min(step_lens)
+            next_step = next_steps[smallest[-1]]
+            # p = [n for n in next_step[0] if type(n)==int]
+            path.append(next_nodes[smallest[-1]])
+            path.extend(next_step[0])
             actions.append('move forward')
+            actions.extend(next_step[1])
+
 
             return [path, actions]
 
