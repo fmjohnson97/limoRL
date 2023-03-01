@@ -265,7 +265,7 @@ class GraphTraverser():
             # return -abs(np.sum(np.dot(landmark_pos, node2pos) - np.dot(landmark_pos, node1pos)))/10#-abs(self.current_direction-self.goalDirection)/100
             return np.mean(-abs((landmark_pos - node2pos) - (landmark_pos - node1pos)))
         else:
-            return reward#/10
+            return reward/10
 
     def on_key_release(self, key):
         #https://pynput.readthedocs.io/en/latest/keyboard.html#monitoring-the-keyboard
