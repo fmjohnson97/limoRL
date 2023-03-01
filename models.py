@@ -492,22 +492,22 @@ class PolicyNetwork(nn.Module):
 class QConvNetwork(nn.Module):
     def __init__(self, feat_dim, action_dim, factor=256):
         super(QConvNetwork, self).__init__()
-        self.conv1 = Conv2d(feat_dim, factor, kernel_size=3, padding=1, stride=2)  # 32x32 => 16x16
+        self.conv1 = Conv2d(feat_dim, factor*2, kernel_size=3, padding=1, stride=2)  # 32x32 => 16x16
         self.activ = GELU()
         self.conv2 = nn.Conv2d(factor, factor, kernel_size=3, padding=1)
-        self.conv3 = Conv2d(factor, 2 * factor, kernel_size=3, padding=1, stride=2)  # 16x16 => 8x8
+        self.conv3 = Conv2d(factor * 2, factor, kernel_size=3, padding=1, stride=2)  # 16x16 => 8x8
         self.conv4 = Conv2d(2 * factor, 2 * factor, kernel_size=3, padding=1)
         self.conv5 = nn.Conv2d(2 * factor, 2 * factor, kernel_size=3, padding=1, stride=2)  # 8x8 => 4x4
-        self.fc1 = nn.Linear(512+action_dim, factor//4)
+        self.fc1 = nn.Linear(factor+action_dim, factor//4)
         self.fc2 = nn.Linear(factor//4, action_dim)
 
     def forward(self, img_feats, action):
         # breakpoint()
         x = self.activ(self.conv1(img_feats))
-        x = self.activ(self.conv2(x))
-        x = self.activ(self.conv3(x))
         x = self.activ(self.conv4(x))
         x = self.activ(self.conv5(x))
+        x = self.activ(self.conv3(x))
+        x = self.activ(self.conv2(x))
         x = self.activ(self.fc1(torch.cat((torch.flatten(x,1),action), axis=-1)))
         x = self.fc2(x)
         return x
@@ -515,13 +515,13 @@ class QConvNetwork(nn.Module):
 class PolicyConvNetwork(nn.Module):
     def __init__(self, args, feat_dim, action_dim, factor=256):
         super(PolicyConvNetwork, self).__init__()
-        self.conv1 = Conv2d(feat_dim, factor, kernel_size=3, padding=1, stride=2)  # 32x32 => 16x16
+        self.conv1 = Conv2d(feat_dim, 2*factor, kernel_size=3, padding=1, stride=2)  # 32x32 => 16x16
         self.activ = GELU()
         self.conv2 = nn.Conv2d(factor, factor, kernel_size=3, padding=1)
-        self.conv3 = Conv2d(factor, 2 * factor, kernel_size=3, padding=1, stride=2)  # 16x16 => 8x8
+        self.conv3 = Conv2d(factor*2, factor, kernel_size=3, padding=1, stride=2)  # 16x16 => 8x8
         self.conv4 = Conv2d(2 * factor, 2 * factor, kernel_size=3, padding=1)
         self.conv5 = nn.Conv2d(2 * factor, 2 * factor, kernel_size=3, padding=1, stride=2)  # 8x8 => 4x4
-        self.fc1 = nn.Linear(512, factor//4)
+        self.fc1 = nn.Linear(factor, factor//4)
         self.logits = nn.Linear(factor//4, action_dim)
         self.sigmoid = Sigmoid()
 
@@ -529,10 +529,10 @@ class PolicyConvNetwork(nn.Module):
         # breakpoint()
         #extracts features from the image observation
         x = self.activ(self.conv1(img_feats))
-        x = self.activ(self.conv2(x))
-        x = self.activ(self.conv3(x))
         x = self.activ(self.conv4(x))
         x = self.activ(self.conv5(x))
+        x = self.activ(self.conv3(x))
+        x = self.activ(self.conv2(x))
         x = self.activ(self.fc1(torch.flatten(x,1)))
         logits = self.sigmoid(self.logits(x))
 
