@@ -111,6 +111,7 @@ def train(args, device):
     ep_len = 0
     total_qloss = 0
     total_policyloss = 0
+    all_total_rewards = []
     env.randomInit()
     obs = env.getImg()
     for step in range(args.epochs*args.steps_per_epoch):
@@ -165,6 +166,14 @@ def train(args, device):
             print('\t Total Q Loss:',total_qloss,' Avg Q Loss:',total_qloss/ep_len)
             print('\t Total Policy Loss:',total_policyloss,' Avg Policy Loss:',total_policyloss/ep_len)
             print()
+            all_total_rewards.append(ep_reward)
+            if np.mean(all_total_rewards[-5:]) > -15:
+                temp = test(args, device, model)
+                if temp>-20:
+                    print('Training Done!')
+                    exit(0)
+                else:
+                    breakpoint()
             ep_len=0
             ep_reward=0
             total_qloss = 0
