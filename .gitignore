@@ -134,3 +134,4 @@ dmypy.json
 /nodePhotosSmall_old/
 *.pt
 *DS_Store*
+/logs/*
