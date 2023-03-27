@@ -257,7 +257,7 @@ class GraphTraverser():
         node1pos = self.graph.config['positions'][str(self.current_node)]
         node2pos = self.graph.config['positions'][str(self.goalNode)]
         landmark_pos = np.array(self.graph.config['landmarks'])
-        if self.current_node == self.goalNode and abs(self.current_direction-self.goalDirection)<=self.base_turn_angle:
+        if self.current_node == self.goalNode and abs(self.current_direction-self.goalDirection)<self.base_turn_angle:
             return 1
             # return abs(np.sum(np.dot(landmark_pos, node1pos)))/10
         elif self.distance_reward:
