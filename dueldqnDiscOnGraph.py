@@ -177,7 +177,7 @@ def train(args, device):
             all_total_rewards.append(ep_reward)
             if len(all_total_rewards)>5 and step>args.use_policy_step and np.mean(all_total_rewards[-5:]) > -11/10:
                 print('Step:',step)
-                temp = [a[1].argmax(-1) for a in replay_buffer.buffer]
+                temp = [a[1] for a in replay_buffer.buffer]
                 print(len([a for a in temp if a == 0]) / len(temp), 'is the forward percentage')
                 print(len([a for a in temp if a == 1]) / len(temp), 'is the left percentage')
                 count = 0
