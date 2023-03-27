@@ -207,7 +207,7 @@ def train(args, device):
 
         if step>0 and step % args.steps_per_epoch == 0 and (step // args.steps_per_epoch) % args.test_freq == 0:
             print('Step:', step)
-            temp = [a[1].argmax(-1) for a in replay_buffer.buffer]
+            temp = [a[1] for a in replay_buffer.buffer]
             print(len([a for a in temp if a == 0]) / len(temp), 'is the forward percentage')
             print(len([a for a in temp if a == 1]) / len(temp), 'is the left percentage')
             test_reward = test(args, device, model, env.goalNode, env.goalDirection)
