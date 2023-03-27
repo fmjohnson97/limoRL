@@ -133,7 +133,7 @@ def train(args, device):
         else:
             goal_img = env.getGoalImg()
             goal_vec = None#env.getGoalVector()
-            breakpoint()
+            # breakpoint()
             action = model.select_action(np.stack([obs]), np.stack([goal_img]))#, np.stack([goal_vec]))
 
         # take action in the environment and save to replay/update trackers
