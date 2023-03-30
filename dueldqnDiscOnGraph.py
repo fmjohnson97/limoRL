@@ -59,7 +59,7 @@ def train(args, device):
     if args.goal_node is not None and args.goal_dir is not None:
         env.goalNode=args.goal_node
         env.goalDirection=args.goal_dir
-    print('Goal is', env.goalNode, env.goalDirection)
+    # print('Goal is', env.goalNode, env.goalDirection)
     obs = env.getImg()
 
     # initialize and populate the replay buffer
@@ -98,7 +98,7 @@ def train(args, device):
         # replay_buffer.addHERSample([obs, action, reward, goal_img, obs_new, done], args.max_reward)
         if done or reward >= 1 or (step>0 and step % args.steps_per_epoch==0):
             env.randomInit()
-            print('Goal is', env.goalNode, env.goalDirection)
+            # print('Goal is', env.goalNode, env.goalDirection)
             obs = env.getImg()
             # print('Goal is', env.goalNode, env.goalDirection)
         else:
@@ -123,7 +123,7 @@ def train(args, device):
     total_policyloss = 0
     all_total_rewards = []
     env.randomInit()
-    print('Goal is', env.goalNode, env.goalDirection)
+    # print('Goal is', env.goalNode, env.goalDirection)
     obs = env.getImg()
     for step in range(args.epochs*args.steps_per_epoch):
         # initial random action or use the learned policy
@@ -172,7 +172,7 @@ def train(args, device):
         # else switch over the obs
         if done or ep_len>=args.steps_per_epoch:
             env.randomInit()
-            print('Goal is', env.goalNode, env.goalDirection)
+            # print('Goal is', env.goalNode, env.goalDirection)
             obs = env.getImg()
             # print('Goal is', env.goalNode, env.goalDirection)
             print('Epoch',ep_count,'completed in',ep_len,'steps with reward =',ep_reward)
