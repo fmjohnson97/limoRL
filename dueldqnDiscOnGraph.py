@@ -21,7 +21,7 @@ def getArgs():
     # training hyperparameters
     parser.add_argument('--batch_size', type=int, default=32, help='number of samples used to update the networks at once')
     parser.add_argument('--epochs', type=int, default=5000, help='number of epochs for training')
-    parser.add_argument('--steps_per_epoch', type=int, default = 30, help='max number of steps for each epoch')
+    parser.add_argument('--steps_per_epoch', type=int, default = 50, help='max number of steps for each epoch')
     parser.add_argument('--use_policy_step', type=int, default=200, help='number of steps before using the learned policy')
     parser.add_argument('--lr', type=float, default=1e-4, help='learning rate for training')
     parser.add_argument('--save_name', default='ddqnDiscOnGraph_', help='prefix name for saving the SAC networks')
@@ -98,6 +98,7 @@ def train(args, device):
         # replay_buffer.addHERSample([obs, action, reward, goal_img, obs_new, done], args.max_reward)
         if done or reward >= 1 or (step>0 and step % args.steps_per_epoch==0):
             env.randomInit()
+            print('Goal is', env.goalNode, env.goalDirection)
             obs = env.getImg()
             # print('Goal is', env.goalNode, env.goalDirection)
         else:
@@ -122,6 +123,7 @@ def train(args, device):
     total_policyloss = 0
     all_total_rewards = []
     env.randomInit()
+    print('Goal is', env.goalNode, env.goalDirection)
     obs = env.getImg()
     for step in range(args.epochs*args.steps_per_epoch):
         # initial random action or use the learned policy
@@ -170,6 +172,7 @@ def train(args, device):
         # else switch over the obs
         if done or ep_len>=args.steps_per_epoch:
             env.randomInit()
+            print('Goal is', env.goalNode, env.goalDirection)
             obs = env.getImg()
             # print('Goal is', env.goalNode, env.goalDirection)
             print('Epoch',ep_count,'completed in',ep_len,'steps with reward =',ep_reward)

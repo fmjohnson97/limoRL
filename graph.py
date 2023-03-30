@@ -186,7 +186,8 @@ class GraphTraverser():
         self.current_node = self.start_node
         self.current_direction = 180
         self.fig, self.ax = plt.subplots(1,1)
-        self.setGoalNode()
+        # self.setGoalNode()
+        self.randomInit()
         if self.recordActions:
             self.path = [self.current_node]
             self.actions = []
@@ -202,7 +203,7 @@ class GraphTraverser():
     def randomInit(self):
         self.current_node = random.choice(range(1,self.graph.config['num_vertices']+1))
         self.current_direction = random.choice(range(0,360,15)) #TODO: expand to all angles maybe?
-        # self.setGoalNode()
+        self.setGoalNode()
         if self.recordActions:
             self.path = [self.current_node]
             self.actions = []
