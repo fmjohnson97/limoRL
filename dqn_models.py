@@ -1,5 +1,6 @@
 # dueling dqn, qnetwork, and memory from here: https://github.com/gouxiangchen/dueling-DQN-pytorch/blob/master/dueling_dqn.py
 
+import cv2
 import torch
 import random
 import torch.nn as nn
@@ -97,6 +98,7 @@ class DuelingDQN(nn.Module):
         self.loss_func = nn.MSELoss()
 
     def forward(self, x, goal):
+        breakpoint()
         x = self.img_backbone.extractFeatures(x)
         goal = self.img_backbone.extractFeatures(goal)
         return self.onlineQNetwork(torch.cat((x,goal), axis=-1))
@@ -141,6 +143,9 @@ class DuelingDQN(nn.Module):
         return loss.item()
 
     def select_action(self, x, goal):
+        # breakpoint()
+        x = np.stack([cv2.cvtColor(cv2.imread(x[0]), cv2.COLOR_BGR2RGB)])
+        goal = np.stack([cv2.cvtColor(cv2.imread(goal[0]), cv2.COLOR_BGR2RGB)])
         x = self.img_backbone.extractFeatures(x)
         goal = self.img_backbone.extractFeatures(goal)
         return self.onlineQNetwork.select_action(torch.cat((x,goal), axis=-1))

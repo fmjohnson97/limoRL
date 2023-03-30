@@ -1,5 +1,6 @@
 import torch
 import random
+import cv2
 import itertools
 import torch.nn as nn
 import numpy as np
@@ -599,6 +600,54 @@ class GoalReplayBuffer():
             g.append(temp[3])
             sprime.append(temp[4])
             gprime.append(temp[5])
+            done.append(temp[6])
+        try:
+            return [np.stack(s), np.stack(a), np.stack(r), np.stack(g), np.stack(sprime), np.stack(gprime), np.stack(done)]
+        except Exception as e:
+            print('Error:',e)
+            breakpoint()
+
+    def addSample(self, sample):
+        # sample of the shape (s, a, r, g, s', done)
+        self.buffer.append(sample)
+        while len(self.buffer)>self.limit:
+            ind = random.randint(0,self.limit-1)
+            self.buffer.pop(ind)
+
+    # Hindsight Experience Replay
+    def addHERSample(self, sample, new_reward):
+        # sample of the form s, a, r, g, s', g', done
+        sample[3] = sample[4]  # replace old goal with next state (as if trying to get there the whole time)
+        sample[2] = new_reward  # replace old reward with success reward (bc achieved the goal)
+        sample[-1] = True  # changing done to True because goal reached
+        self.addSample(sample)
+
+class GoalReadImagesBuffer():
+    def __init__(self, args):
+        self.buffer=[]
+        self.limit=args.buffer_limit
+        self.batch_size=args.batch_size
+
+    def sample(self, batch_size=None):
+        if batch_size is None:
+            batch_size=self.batch_size
+        s=[]
+        a=[]
+        r=[]
+        g=[]
+        sprime=[]
+        gprime=[]
+        done=[]
+        for i in range(batch_size):
+            # breakpoint()
+            ind=random.randint(0,len(self.buffer)-1)
+            temp=self.buffer[ind]
+            s.append(cv2.cvtColor(cv2.imread(temp[0]), cv2.COLOR_BGR2RGB))
+            a.append(temp[1])
+            r.append(temp[2])
+            g.append((cv2.cvtColor(cv2.imread(temp[3][0]), cv2.COLOR_BGR2RGB), temp[3][1]))
+            sprime.append(cv2.cvtColor(cv2.imread(temp[4]), cv2.COLOR_BGR2RGB))
+            gprime.append((cv2.cvtColor(cv2.imread(temp[5][0]), cv2.COLOR_BGR2RGB), temp[5][1]))
             done.append(temp[6])
         try:
             return [np.stack(s), np.stack(a), np.stack(r), np.stack(g), np.stack(sprime), np.stack(gprime), np.stack(done)]

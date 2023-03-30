@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from torchvision.models import ResNet18_Weights
 
 from dqn_models import Memory, DuelingDQN
-from models import GoalReplayBuffer, ResnetBackbone
+from models import GoalReadImagesBuffer, ResnetBackbone
 from graph import GraphTraverser, Graph
 
 def getArgs():
@@ -21,7 +21,7 @@ def getArgs():
     # training hyperparameters
     parser.add_argument('--batch_size', type=int, default=32, help='number of samples used to update the networks at once')
     parser.add_argument('--epochs', type=int, default=5000, help='number of epochs for training')
-    parser.add_argument('--steps_per_epoch', type=int, default = 20, help='max number of steps for each epoch')
+    parser.add_argument('--steps_per_epoch', type=int, default = 30, help='max number of steps for each epoch')
     parser.add_argument('--use_policy_step', type=int, default=200, help='number of steps before using the learned policy')
     parser.add_argument('--lr', type=float, default=1e-4, help='learning rate for training')
     parser.add_argument('--save_name', default='ddqnDiscOnGraph_', help='prefix name for saving the SAC networks')
@@ -33,9 +33,9 @@ def getArgs():
     parser.add_argument('--final_epsilon', type=float, default=0.0001, help='final epsilon value')
     parser.add_argument('--explore', type=int, default=20000, help='number of epochs for training')
     parser.add_argument('--feat_dim', type=int, default=512 * 7 * 7*2, help='number of epochs for training')
-
-
-
+    parser.add_argument('--goal_node', type=int, default=None, help='number of epochs for training')
+    parser.add_argument('--goal_dir', type=int, default=None, help='number of epochs for training')
+    parser.add_argument('--img_paths', action='store_true', help='skip training and just test')
 
 
     # buffer hyperparameters
@@ -54,13 +54,16 @@ def getArgs():
 
 def train(args, device):
     # initialize the environment and get the first observation
-    env = GraphTraverser(Graph(config_path=args.config_file), distance_reward=args.dist_reward)
+    env = GraphTraverser(Graph(config_path=args.config_file, img_paths=args.img_paths), distance_reward=args.dist_reward)
     env.randomInit()
+    if args.goal_node is not None and args.goal_dir is not None:
+        env.goalNode=args.goal_node
+        env.goalDirection=args.goal_dir
     print('Goal is', env.goalNode, env.goalDirection)
     obs = env.getImg()
 
     # initialize and populate the replay buffer
-    replay_buffer = GoalReplayBuffer(args)
+    replay_buffer = GoalReadImagesBuffer(args)
     step = 0
     while step < args.buffer_init_steps:
         # breakpoint()
@@ -133,7 +136,6 @@ def train(args, device):
         else:
             goal_img = env.getGoalImg()
             goal_vec = None#env.getGoalVector()
-            # breakpoint()
             action = model.select_action(np.stack([obs]), np.stack([goal_img]))#, np.stack([goal_vec]))
 
         # take action in the environment and save to replay/update trackers
@@ -216,7 +218,7 @@ def train(args, device):
 
 def test(args, device, model=None, goalNode=None, goalDirection=None):
     print('testing!')
-    env = GraphTraverser(Graph(config_path=args.config_file), distance_reward=args.dist_reward)
+    env = GraphTraverser(Graph(config_path=args.config_file, img_paths=args.img_paths), distance_reward=args.dist_reward)
     if goalNode is not None:
         env.goalNode = goalNode
     if goalDirection is not None:

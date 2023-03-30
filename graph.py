@@ -13,7 +13,7 @@ except:
 from matplotlib import pyplot as plt
 
 class Graph():
-    def __init__(self, config_path=None, config=None):
+    def __init__(self, config_path=None, config=None, img_paths=False):
         if config is None or type(config)!=dict:
             if config_path is None:
                 print('Graph object needs either a config json/dict object or the path to one')
@@ -24,6 +24,7 @@ class Graph():
         else:
             self.config = config
 
+        self.img_paths = img_paths
         self.vertices = [None]*int(self.config['num_vertices'])
         self.populateVertices(self.config['num_vertices'], self.config['photoPath'])
         self.edges = np.zeros((self.config['num_vertices'],self.config['num_vertices']))
@@ -67,12 +68,16 @@ class Graph():
 
         choice = random.choice(self.angleKey[str(vertex_num)][str(heading)])
         # breakpoint()
+        path = self.vertices[vertex_num - 1] + 'node' + str(vertex_num) + '_' + choice + self.config['photoExtension']
         try:
-            image = cv2.imread(self.vertices[vertex_num - 1] + 'node' + str(vertex_num) + '_' + choice + self.config['photoExtension'])
+            image = cv2.imread(path)
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         except:
             breakpoint()
-        return image
+        if self.img_paths:
+            return path
+        else:
+            return image
 
     def addNode(self, nodeFeatures=None, nodeFeatPath=None):
         if nodeFeatures is None:
