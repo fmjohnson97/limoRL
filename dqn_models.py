@@ -152,3 +152,7 @@ class DuelingDQN(nn.Module):
 
     def save_models(self, save_name, goalNode, goalDirection):
         torch.save(self.onlineQNetwork.state_dict(), save_name+'.pt')#+str(goalNode)+'_'+str(goalDirection)+'.pt')
+
+    def load_states(self, args):
+        self.onlineQNetwork.load_state_dict(torch.load(args.save_name+'.pt'))
+        self.targetQNetwork.load_state_dict(self.onlineQNetwork.state_dict())
