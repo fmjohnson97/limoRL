@@ -60,7 +60,9 @@ def train(args, device, writer):
     if args.goal_node is not None and args.goal_dir is not None:
         env.goalNode=args.goal_node
         env.goalDirection=args.goal_dir
-    # print('Goal is', env.goalNode, env.goalDirection)
+    print('Goal is', env.goalNode, env.goalDirection)
+    writer.add_scalar('goal node',env.goalNode,0)
+    writer.add_scalar('goal direction',env.goalDirection,0)
     obs = env.getImg()
 
     # initialize and populate the replay buffer
