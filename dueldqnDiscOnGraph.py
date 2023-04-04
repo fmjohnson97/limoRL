@@ -7,6 +7,7 @@ import time
 
 import matplotlib.pyplot as plt
 from torchvision.models import ResNet18_Weights
+from torch.utils.tensorboard import SummaryWriter
 
 from dqn_models import Memory, DuelingDQN
 from models import GoalReadImagesBuffer, ResnetBackbone
@@ -52,7 +53,7 @@ def getArgs():
     return parser.parse_args()
 
 
-def train(args, device):
+def train(args, device, writer):
     # initialize the environment and get the first observation
     env = GraphTraverser(Graph(config_path=args.config_file, img_paths=args.img_paths), distance_reward=args.dist_reward)
     env.randomInit()
@@ -179,6 +180,9 @@ def train(args, device):
             print('\t Total Q Loss:',total_qloss,' Avg Q Loss:',total_qloss/ep_len)
             print('\t Total Policy Loss:',total_policyloss,' Avg Policy Loss:',total_policyloss/ep_len)
             print()
+            writer.add_scalar('training reward', ep_reward, step)
+            writer.add_scalar('training episode length', ep_len, step)
+            writer.add_scalar('training loss', total_qloss, step)
             all_total_rewards.append(ep_reward)
             if len(all_total_rewards)>5 and step>args.use_policy_step and np.mean(all_total_rewards[-5:]) > -11/10:
                 print('Step:',step)
@@ -188,9 +192,10 @@ def train(args, device):
                 count = 0
                 temp=0
                 while count<5 and temp>-2:
-                    temp = test(args, device, model, env.goalNode, env.goalDirection)
+                    temp = test(args, device, writer, model, env.goalNode, env.goalDirection)
+                    writer.add_scalar('intermediate test reward', temp, step+count)
                     count+=1
-                if count>=5:
+                if count>=10 and step>2000:
                     print('Training Done!')
                     exit(0)
 
@@ -215,11 +220,11 @@ def train(args, device):
             temp = [a[1] for a in replay_buffer.buffer]
             print(len([a for a in temp if a == 0]) / len(temp), 'is the forward percentage')
             print(len([a for a in temp if a == 1]) / len(temp), 'is the left percentage')
-            test_reward = test(args, device, model, env.goalNode, env.goalDirection)
+            test_reward = test(args, device, writer, model, env.goalNode, env.goalDirection)
 
     return model
 
-def test(args, device, model=None, goalNode=None, goalDirection=None):
+def test(args, device, writer, model=None, goalNode=None, goalDirection=None):
     print('testing!')
     env = GraphTraverser(Graph(config_path=args.config_file, img_paths=args.img_paths), distance_reward=args.dist_reward)
     if goalNode is not None:
@@ -299,7 +304,10 @@ if __name__ == '__main__':
     args = getArgs()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+    writer = SummaryWriter('logs/')
+
     if not args.test:
-        model = train(args, device)
-    test(args, device)#, model)
+        model = train(args, device, writer)
+    temp = test(args, device, writer)#, model)
+    writer.add_scalar('final test reward', temp, 0)
 
