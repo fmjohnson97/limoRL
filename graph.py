@@ -173,6 +173,72 @@ class Graph():
                 return ['turn right'] * times
         return []
 
+    def drawGraph(self):
+        drawing = np.ones((81,81,3), np.uint8)*255
+
+        ### draw outer walls ###
+        #draw top wall
+        cv2.line(drawing, (0,4), (16,4), (0,0,0))
+        cv2.line(drawing, (16,4), (16,8), (0, 0, 0))
+        cv2.line(drawing, (16,8), (72,8), (0, 0, 0))
+
+        #draw left wall
+        cv2.line(drawing, (0, 4), (0,80), (0, 0, 0))
+
+        #draw bottom wall
+        cv2.line(drawing, (0, 80), (72, 80), (0, 0, 0))
+
+        #draw right wall
+        cv2.line(drawing, (72, 80), (72, 8), (0, 0, 0))
+
+        ### draw inner walls/obstacles ###
+        # draw left bottom boxes/table
+        cv2.line(drawing, (24, 80), (24, 60), (0, 0, 0))
+        cv2.line(drawing, (24, 60), (20, 60), (0, 0, 0))
+        cv2.line(drawing, (20, 60), (20, 36), (0, 0, 0))
+        cv2.line(drawing, (20, 36), (12, 36), (0, 0, 0))
+        cv2.line(drawing, (12, 36), (12, 44), (0, 0, 0))
+        cv2.line(drawing, (12, 44), (0, 44), (0, 0, 0))
+
+        #draw middle island
+        cv2.line(drawing, (32, 80), (32, 20), (0, 0, 0))
+        cv2.line(drawing, (32, 20), (60, 20), (0, 0, 0))
+        cv2.line(drawing, (60, 20), (60, 56), (0, 0, 0))
+        cv2.line(drawing, (60, 56), (56, 56), (0, 0, 0))
+        cv2.line(drawing, (56, 56), (56, 80), (0, 0, 0))
+
+        #draw bottom right corner
+        cv2.line(drawing, (68, 76), (72, 76), (0, 0, 0))
+        cv2.line(drawing, (68,76), (68, 80), (0, 0, 0))
+
+        #draw red space on right wall
+        cv2.line(drawing, (68, 60), (72, 60), (0, 0, 0))
+        cv2.line(drawing, (68, 60), (68, 20), (0, 0, 0))
+        cv2.line(drawing, (68, 20), (72, 20), (0, 0, 0))
+
+        #draw red space on the top wall
+        cv2.line(drawing, (72, 12), (60, 12), (0, 0, 0))
+        cv2.line(drawing, (60, 12), (60, 8), (0, 0, 0))
+
+        # draw dots for each node with labels
+        for point in self.config['positions']:
+            cv2.circle(drawing, (int(point[0]*4),int(point[1]*4)), 1, (204,0,204),-1)
+
+        # label reference objects for easier localization
+
+        return drawing
+
+    def drawPathOnGraph(self, path):
+        drawing = self.drawGraph()
+
+        #draw path on the image
+        for p in range(len(path)-1):
+            cv2.line(drawing, (int(path[p][0]*4),int(path[p][1]*4)), (int(path[p+1][0]*4),int(path[p+1][1]*4)), (0,255,0))
+
+        cv2.circle(drawing, )
+
+        return drawing
+
 class GraphTraverser():
     def __init__(self, graph: Graph, start_node=1, base_turn_angle=15, plotImgs=False, recordActions=False, distance_reward = True, human=False):
         self.graph = graph

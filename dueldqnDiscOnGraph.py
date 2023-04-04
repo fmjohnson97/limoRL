@@ -193,7 +193,7 @@ def train(args, device, writer):
                 print(len([a for a in temp if a == 1]) / len(temp), 'is the left percentage')
                 count = 0
                 temp=0
-                while count<5 and temp>-2:
+                while count<10 and temp>-2:
                     temp = test(args, device, writer, model, env.goalNode, env.goalDirection)
                     writer.add_scalar('intermediate test reward', temp, step+count)
                     count+=1
