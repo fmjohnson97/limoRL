@@ -194,7 +194,7 @@ def train(args, device, writer):
                 count = 0
                 temp=0
                 while count<10 and temp>-2:
-                    temp = test(args, device, writer, model, env.goalNode, env.goalDirection)
+                    temp, _ = test(args, device, writer, model, env.goalNode, env.goalDirection)
                     writer.add_scalar('intermediate test reward', temp, step+count)
                     count+=1
                 if count>=10 and step>2000:
@@ -222,11 +222,12 @@ def train(args, device, writer):
             temp = [a[1] for a in replay_buffer.buffer]
             print(len([a for a in temp if a == 0]) / len(temp), 'is the forward percentage')
             print(len([a for a in temp if a == 1]) / len(temp), 'is the left percentage')
-            test_reward = test(args, device, writer, model, env.goalNode, env.goalDirection)
+            test_reward, _ = test(args, device, writer, model, env.goalNode, env.goalDirection)
+            writer.add_scalar('intermediate test reward', temp, step + count)
 
     return model
 
-def test(args, device, writer, model=None, goalNode=None, goalDirection=None):
+def test(args, device, writer, model=None, goalNode=None, goalDirection=None, plot_graph=False):
     print('testing!')
     env = GraphTraverser(Graph(config_path=args.config_file, img_paths=args.img_paths), distance_reward=args.dist_reward)
     if goalNode is not None:
@@ -296,7 +297,11 @@ def test(args, device, writer, model=None, goalNode=None, goalDirection=None):
     #     print()
     # print('Extraneous Actions:', action_diffs)
     time.sleep(5)
-    return total_reward
+    graph_img = None
+    if plot_graph and optimal_solution is not None:
+        path = [p for p in optimal_solution[0] if type(p)==int]
+        graph_img = env.graph.drawPathOnGraph(path)
+    return total_reward, graph_img
 
 
 if __name__ == '__main__':
@@ -310,6 +315,8 @@ if __name__ == '__main__':
 
     if not args.test:
         model = train(args, device, writer)
-    temp = test(args, device, writer)#, model)
+    temp, graph_img = test(args, device, writer, plot_graph=True)#, model)
     writer.add_scalar('final test reward', temp, 0)
+    plt.imshow(graph_img)
+    plt.show()
 

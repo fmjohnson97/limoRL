@@ -222,7 +222,7 @@ class Graph():
 
         # draw dots for each node with labels
         for point in self.config['positions']:
-            cv2.circle(drawing, (int(point[0]*4),int(point[1]*4)), 1, (204,0,204),-1)
+            cv2.circle(drawing, (72-int(point[0]*4),80-int(point[1]*4)), 1, (204,0,204),-1)
 
         # label reference objects for easier localization
 
@@ -233,9 +233,12 @@ class Graph():
 
         #draw path on the image
         for p in range(len(path)-1):
-            cv2.line(drawing, (int(path[p][0]*4),int(path[p][1]*4)), (int(path[p+1][0]*4),int(path[p+1][1]*4)), (0,255,0))
+            point1 = self.config['positions'][str(path[p])]
+            point2 = self.config['positions'][str(path[p+1])]
+            cv2.line(drawing, (72-int(point1[0]*4),80-int(point1[1]*4)), (72-int(point2[0]*4),80-int(point2[1]*4)), (0,255,0))
 
-        cv2.circle(drawing, )
+        point = self.config['positions'][str(path[-1])]
+        cv2.circle(drawing, (72-int(point[0]*4),80-int(point[1]*4)), 1, (0,0,255),-1)
 
         return drawing
 
