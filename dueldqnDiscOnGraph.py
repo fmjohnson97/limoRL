@@ -317,6 +317,7 @@ if __name__ == '__main__':
         model = train(args, device, writer)
     temp, graph_img = test(args, device, writer, plot_graph=True)#, model)
     writer.add_scalar('final test reward', temp, 0)
+    writer.add_image('robot_final_test_path',graph_img,0, dataformats='HWC')
     plt.imshow(graph_img)
     plt.show()
 
