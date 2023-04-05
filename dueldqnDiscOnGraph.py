@@ -223,7 +223,7 @@ def train(args, device, writer):
             print(len([a for a in temp if a == 0]) / len(temp), 'is the forward percentage')
             print(len([a for a in temp if a == 1]) / len(temp), 'is the left percentage')
             test_reward, _ = test(args, device, writer, model, env.goalNode, env.goalDirection)
-            writer.add_scalar('intermediate test reward', temp, step + count)
+            writer.add_scalar('intermediate test reward', temp, step)
 
     return model
 
