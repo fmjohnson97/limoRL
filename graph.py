@@ -289,10 +289,9 @@ class GraphTraverser():
             # self.goalNode = choice[1]
             # self.goalDirection = choice[2]
 
-            # this is for going 1 node away
-            first_level_reachable = self.graph.getAllNeighbors(self.current_node)
-            choice = random.choice(first_level_reachable)
-            self.goalNode = choice[1]
+            # first_level_reachable = self.graph.getAllNeighbors(self.current_node)
+            # choice = random.choice(first_level_reachable)
+            self.goalNode = random.choice(range(1,self.graph.config['num_vertices']+1))
             self.goalDirection = random.choice(range(0,360,15)) #TODO: expand to all angles maybe?
             # print(self.current_node, self.goalNode, first_level_reachable)
             # time.sleep(0.5)
